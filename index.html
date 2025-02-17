@@ -1,0 +1,78 @@
+<!DOCTYPE html lang="zh-CN">
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Webcam Runner 3D</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        .overlay {
+            position: fixed;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.5);
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #webcamView {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 320px;
+            height: 240px;
+            border: 2px solid white;
+            z-index: 100;
+        }
+        #gameCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #instructions {
+            composes: overlay;
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+        }
+        #fps {
+            composes: overlay;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+        }
+        #gameState {
+            composes: overlay;
+            top: 80px;
+            left: 10px;
+            padding: 10px;
+            min-width: 200px;
+        }
+        .status-good {
+            color: #4CAF50;
+        }
+        .status-warning {
+            color: #FFC107;
+        }
+        .status-error {
+            color: #F44336;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">
+        <h2>Webcam Runner 3D</h2>
+        <p>跑步姿势：原地跑步</p>
+        <p>速度：根据跑步频率自动调整</p>
+    </div>
+    <div id="fps">FPS: <span id="fpsValue">0</span></div>
+    <div id="gameState"></div>
+    <video id="webcamView" autoplay></video>
+    <canvas id="gameCanvas"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4.1633558788/pose.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
