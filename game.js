@@ -68,6 +68,9 @@ const bufferSize = 5;
 let consecutiveMovements = 0;
 const requiredConsecutiveMovements = 3;
 
+// 添加检测状态控制
+let isDetecting = false;
+
 async function init() {
     try {
         // 重置游戏状态
@@ -195,18 +198,26 @@ async function init() {
         video.srcObject = stream;
         video.onloadedmetadata = () => {
             video.play();
-            detectPose();
+            detectPose();  // 启动检测循环，但默认不会检测
+            stopDetection(); // 初始状态设置为不检测
         };
 
-        // 添加校准按钮
+        // 在 init 函数中修改按钮创建和事件绑定代码
         const calibrateBtn = document.createElement('button');
+        calibrateBtn.id = 'calibrateBtn';
         calibrateBtn.textContent = '开始校准';
         calibrateBtn.style.position = 'fixed';
         calibrateBtn.style.top = '20px';
         calibrateBtn.style.right = '20px';
-        calibrateBtn.onclick = startCalibration;
+
+        // 立即绑定点击事件
+        calibrateBtn.addEventListener('click', () => {
+            console.log('点击校准按钮'); // 调试日志
+            startCalibration();
+        });
+
         document.body.appendChild(calibrateBtn);
-        console.log('校准按钮已创建并添加到DOM'); // 添加调试信息
+        console.log('校准按钮已创建并添加到DOM'); // 调试日志
 
         // 开始动画循环
         animate();
@@ -222,7 +233,7 @@ function startCalibration() {
     if (gameState.calibrationStatus === '校准完成') return;
     
     console.log('开始校准...'); // 添加调试信息
-    gameState.calibrationStatus = '校准中...';
+    gameState.calibrationStatus = '校准中';
     gameState.debugInfo = '请保持站立姿势2秒';
     updateGameState();
     console.log('校准状态已更新:', gameState.calibrationStatus); // 添加调试信息
@@ -232,175 +243,21 @@ function startCalibration() {
         sampleCount: 30, // 2秒数据（假设30fps）
         keyPoints: {}
     };
+
+    // 开始检测
+    isDetecting = true;
 }
 
-
-function onPoseResults(results) {
-    if (!results.poseLandmarks) return;
-
-    const landmarks = results.poseLandmarks;
-    console.log('检测到的关键点:', landmarks); // 添加调试信息
-    let KEYPOINTS = {
-        LEFT_HIP: 23,
-        RIGHT_HIP: 24,
-        LEFT_KNEE: 25,
-        RIGHT_KNEE: 26,
-        LEFT_ANKLE: 27,
-        RIGHT_ANKLE: 28,
-        LEFT_SHOULDER: 11,
-        RIGHT_SHOULDER: 12,
-        LEFT_ELBOW: 13,
-        RIGHT_ELBOW: 14
-    };
-    
-    // 检查关键点数量，判断是否为半身
-    const minLandmarksForFullBody = 20; // 阈值可以调整
-    if (landmarks.length < minLandmarksForFullBody) {
-       // 如果是半身，则只使用上半身的关键点
-       KEYPOINTS = {
-          LEFT_SHOULDER: 11,
-          RIGHT_SHOULDER: 12,
-          LEFT_ELBOW: 13,
-          RIGHT_ELBOW: 14
-       };
-    }
-
-    // 校准逻辑
-    console.log('当前校准状态:', gameState.calibrationStatus); // 添加调试信息
-    if (gameState.calibrationStatus === '校准中') {
-        if (calibrationData.samples.length < calibrationData.sampleCount) {
-            calibrationData.samples.push(landmarks);
-            gameState.debugInfo = `校准进度: ${Math.round(calibrationData.samples.length/calibrationData.sampleCount*100)}%`;
-            updateGameState();
-            console.log('校准进度:', calibrationData.samples.length, '/', calibrationData.sampleCount); // 添加调试信息
-        } else {
-            console.log('校准完成条件满足!'); // 添加调试信息
-            // 计算基准值
-            const baseValues = {};
-            for (const kp in KEYPOINTS) {
-                const values = calibrationData.samples.map(s => s[KEYPOINTS[kp]]);
-                baseValues[kp] = {
-                    x: average(values.map(v => v.x)),
-                    y: average(values.map(v => v.y)),
-                    z: average(values.map(v => v.z))
-                };
-            }
-            calibrationData.baseValues = baseValues;
-            gameState.calibrationStatus = '校准完成';
-            gameState.debugInfo = '校准完成！';
-            updateGameState();
-            console.log('校准完成!'); // 添加调试信息
-        }
-        return;
-    }
-
-    // 运动检测逻辑（仅在校准完成后执行）
-    if (gameState.calibrationStatus !== '校准完成') return;
-
-    // 计算关节角度
-    const getAngle = (a, b, c) => {
-        if (!a || !b || !c) return 0;
-        const ab = [b.x - a.x, b.y - a.y];
-        const cb = [b.x - c.x, b.y - c.y];
-        
-        const dot = ab[0]*cb[0] + ab[1]*cb[1];
-        const magAB = Math.sqrt(ab[0]**2 + ab[1]**2);
-        const magCB = Math.sqrt(cb[0]**2 + cb[1]**2);
-        
-        return Math.acos(dot/(magAB*magCB)) * (180/Math.PI);
-    };
-
-    // 获取基准值
-    const base = calibrationData.baseValues;
-    
-    let kneeAngleDiff = 0;
-    let armMovement = 0;
-
-    // 检查是否包含下半身关键点
-    if (KEYPOINTS.LEFT_HIP) {
-        // 计算下肢运动特征
-        const leftKneeAngle = getAngle(
-            landmarks[KEYPOINTS.LEFT_HIP],
-            landmarks[KEYPOINTS.LEFT_KNEE],
-            landmarks[KEYPOINTS.LEFT_ANKLE]
-        );
-        
-        const rightKneeAngle = getAngle(
-            landmarks[KEYPOINTS.RIGHT_HIP],
-            landmarks[KEYPOINTS.RIGHT_KNEE],
-            landmarks[KEYPOINTS.RIGHT_ANKLE]
-        );
-        kneeAngleDiff = Math.abs(leftKneeAngle - rightKneeAngle);
-    }
-
-    // 检查是否包含上肢关键点
-    if (KEYPOINTS.LEFT_ELBOW) {
-        // 计算上肢运动特征
-        const leftArmMovement = Math.sqrt(
-            (landmarks[KEYPOINTS.LEFT_ELBOW].x - base[KEYPOINTS.LEFT_ELBOW].x)**2 +
-            (landmarks[KEYPOINTS.LEFT_ELBOW].y - base[KEYPOINTS.LEFT_ELBOW].y)**2
-        );
-
-        const rightArmMovement = Math.sqrt(
-            (landmarks[KEYPOINTS.RIGHT_ELBOW].x - base[KEYPOINTS.RIGHT_ELBOW].x)**2 +
-            (landmarks[KEYPOINTS.RIGHT_ELBOW].y - base[KEYPOINTS.RIGHT_ELBOW].y)**2
-        );
-        armMovement = (leftArmMovement + rightArmMovement) * 10;
-    }
-
-    // 运动强度计算
-    let movementScore = kneeAngleDiff * 0.8 + armMovement * 0.2;
-    
-    // 更新运动缓冲区
-    movementBuffer.push(movementScore);
-    if (movementBuffer.length > 10) movementBuffer.shift(); // 增大缓冲区
-    
-    // 使用加权平均
-    const weightedMovement = movementBuffer.reduce((acc, val, idx) => 
-        acc + val * (idx + 1)/movementBuffer.length, 0) / 
-        (movementBuffer.length * (movementBuffer.length + 1) / 2);
-
-    // 动态阈值调整
-    const baselineThreshold = 15; // 根据实际测试调整
-    const dynamicThreshold = baselineThreshold * (1 + speed/maxSpeed);
-    
-    // 步态检测逻辑
-    const now = Date.now();
-    if (weightedMovement > dynamicThreshold) {
-        if (!isRunning) consecutiveMovements++;
-        
-        if (consecutiveMovements >= 4) { // 需要连续4帧确认
-            isRunning = true;
-            targetSpeed = Math.min(maxSpeed, targetSpeed + 0.3);
-            
-            // 步数计数逻辑
-            if (now - lastStepTime > 300) { // 最小步间隔300ms
-                stepCount++;
-                lastStepTime = now;
-            }
-        }
-    } else {
-        consecutiveMovements = Math.max(0, consecutiveMovements - 2);
-        targetSpeed = Math.max(0, targetSpeed - 0.4);
-    }
-
-    // 更新游戏状态
-    gameState.movementQuality = Math.min(100, weightedMovement / baselineThreshold * 100);
-    gameState.currentSpeed = speed;
-    gameState.stepCount = stepCount;
+// 添加停止检测函数
+function stopDetection() {
+    isDetecting = false;
+    gameState.debugInfo = '点击开始校准按钮开始';
     updateGameState();
-}
-
-
-// 辅助函数：计算平均值
-function average(arr) {
-    return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
 async function detectPose() {
     const video = document.getElementById('webcamView');
-    if (video.readyState === 4) {
-        console.log('正在检测姿势...'); // 添加调试信息
+    if (video.readyState === 4 && isDetecting) {
         await pose.send({image: video});
     }
     requestAnimationFrame(detectPose);
@@ -542,4 +399,229 @@ window.addEventListener('load', () => {
     init().catch(error => {
         console.error('游戏启动失败:', error);
     });
+
 });
+
+// 辅助函数：计算平均值
+function average(arr) {
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+// 计算关节角度
+function getAngle(a, b, c) {
+    if (!a || !b || !c || 
+        typeof a.x !== 'number' || typeof a.y !== 'number' ||
+        typeof b.x !== 'number' || typeof b.y !== 'number' ||
+        typeof c.x !== 'number' || typeof c.y !== 'number') {
+        return 0;
+    }
+    
+    const ab = [b.x - a.x, b.y - a.y];
+    const cb = [b.x - c.x, b.y - c.y];
+    
+    const dot = ab[0]*cb[0] + ab[1]*cb[1];
+    const magAB = Math.sqrt(ab[0]**2 + ab[1]**2);
+    const magCB = Math.sqrt(cb[0]**2 + cb[1]**2);
+    
+    // 防止除以零
+    if (magAB === 0 || magCB === 0) return 0;
+    
+    const cosTheta = dot/(magAB*magCB);
+    // 确保 cosTheta 在有效范围内
+    const clampedCosTheta = Math.max(-1, Math.min(1, cosTheta));
+    return Math.acos(clampedCosTheta) * (180/Math.PI);
+}
+
+function onPoseResults(results) {
+    if (!results || !results.poseLandmarks) {
+        console.log('未检测到姿势');
+        targetSpeed = 0; // 直接停止
+        isRunning = false;
+        consecutiveMovements = 0;
+        gameState.debugInfo = '未检测到姿势';
+        updateGameState();
+        return;
+    }
+
+    const landmarks = results.poseLandmarks;
+    if (!Array.isArray(landmarks)) {
+        console.error('姿势关键点格式错误');
+        return;
+    }
+    console.log('检测到的关键点:', landmarks); // 添加调试信息
+    let KEYPOINTS = {
+        LEFT_HIP: 23,
+        RIGHT_HIP: 24,
+        LEFT_KNEE: 25,
+        RIGHT_KNEE: 26,
+        LEFT_ANKLE: 27,
+        RIGHT_ANKLE: 28,
+        LEFT_SHOULDER: 11,
+        RIGHT_SHOULDER: 12,
+        LEFT_ELBOW: 13,
+        RIGHT_ELBOW: 14
+    };
+    
+    // 计算手臂运动
+    const now = Date.now();
+    
+    // 初始化历史记录
+    if (!window.poseHistory) {
+        window.poseHistory = {
+            timestamps: [],
+            leftElbow: [],
+            leftShoulder: [],
+            rightElbow: [],
+            rightShoulder: [],
+            lastUpdateTime: now
+        };
+    }
+
+    // 更新历史记录
+    const historyWindow = 300; // 300ms的时间窗口
+    window.poseHistory.timestamps.push(now);
+    
+    if (landmarks[KEYPOINTS.LEFT_ELBOW] && landmarks[KEYPOINTS.LEFT_SHOULDER]) {
+        window.poseHistory.leftElbow.push({
+            x: landmarks[KEYPOINTS.LEFT_ELBOW].x,
+            y: landmarks[KEYPOINTS.LEFT_ELBOW].y
+        });
+        window.poseHistory.leftShoulder.push({
+            x: landmarks[KEYPOINTS.LEFT_SHOULDER].x,
+            y: landmarks[KEYPOINTS.LEFT_SHOULDER].y
+        });
+    }
+    
+    if (landmarks[KEYPOINTS.RIGHT_ELBOW] && landmarks[KEYPOINTS.RIGHT_SHOULDER]) {
+        window.poseHistory.rightElbow.push({
+            x: landmarks[KEYPOINTS.RIGHT_ELBOW].x,
+            y: landmarks[KEYPOINTS.RIGHT_ELBOW].y
+        });
+        window.poseHistory.rightShoulder.push({
+            x: landmarks[KEYPOINTS.RIGHT_SHOULDER].x,
+            y: landmarks[KEYPOINTS.RIGHT_SHOULDER].y
+        });
+    }
+
+    // 保持窗口大小
+    while (now - window.poseHistory.timestamps[0] > historyWindow) {
+        window.poseHistory.timestamps.shift();
+        window.poseHistory.leftElbow.shift();
+        window.poseHistory.leftShoulder.shift();
+        window.poseHistory.rightElbow.shift();
+        window.poseHistory.rightShoulder.shift();
+    }
+
+    // 计算速度矢量
+    const calculateVelocity = (current, previous, timeDelta) => {
+        if (!current || !previous) return { x: 0, y: 0 };
+        return {
+            x: (current.x - previous.x) / timeDelta,
+            y: (current.y - previous.y) / timeDelta
+        };
+    };
+
+    // 计算运动强度
+    const calculateIntensity = (velocity) => {
+        return Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    };
+
+    let totalIntensity = 0;
+    let validMeasurements = 0;
+
+    // 计算左臂运动
+    if (window.poseHistory.leftElbow.length >= 2) {
+        const currentIdx = window.poseHistory.leftElbow.length - 1;
+        const prevIdx = currentIdx - 1;
+        const timeDelta = (window.poseHistory.timestamps[currentIdx] - window.poseHistory.timestamps[prevIdx]) / 1000;
+
+        // 计算手肘相对于肩膀的运动
+        const currentRelative = {
+            x: window.poseHistory.leftElbow[currentIdx].x - window.poseHistory.leftShoulder[currentIdx].x,
+            y: window.poseHistory.leftElbow[currentIdx].y - window.poseHistory.leftShoulder[currentIdx].y
+        };
+
+        const previousRelative = {
+            x: window.poseHistory.leftElbow[prevIdx].x - window.poseHistory.leftShoulder[prevIdx].x,
+            y: window.poseHistory.leftElbow[prevIdx].y - window.poseHistory.leftShoulder[prevIdx].y
+        };
+
+        const velocity = calculateVelocity(currentRelative, previousRelative, timeDelta);
+        totalIntensity += calculateIntensity(velocity);
+        validMeasurements++;
+    }
+
+    // 计算右臂运动
+    if (window.poseHistory.rightElbow.length >= 2) {
+        const currentIdx = window.poseHistory.rightElbow.length - 1;
+        const prevIdx = currentIdx - 1;
+        const timeDelta = (window.poseHistory.timestamps[currentIdx] - window.poseHistory.timestamps[prevIdx]) / 1000;
+
+        // 计算手肘相对于肩膀的运动
+        const currentRelative = {
+            x: window.poseHistory.rightElbow[currentIdx].x - window.poseHistory.rightShoulder[currentIdx].x,
+            y: window.poseHistory.rightElbow[currentIdx].y - window.poseHistory.rightShoulder[currentIdx].y
+        };
+
+        const previousRelative = {
+            x: window.poseHistory.rightElbow[prevIdx].x - window.poseHistory.rightShoulder[prevIdx].x,
+            y: window.poseHistory.rightElbow[prevIdx].y - window.poseHistory.rightShoulder[prevIdx].y
+        };
+
+        const velocity = calculateVelocity(currentRelative, previousRelative, timeDelta);
+        totalIntensity += calculateIntensity(velocity);
+        validMeasurements++;
+    }
+
+    // 计算平均运动强度
+    const currentMovement = validMeasurements > 0 ? totalIntensity / validMeasurements : 0;
+    
+    console.log('当前运动强度:', currentMovement.toFixed(3));
+
+    // 更新运动缓冲区
+    movementBuffer.push(currentMovement);
+    if (movementBuffer.length > 3) {
+        movementBuffer.shift();
+    }
+
+    // 使用最大值作为当前运动强度
+    const maxMovement = Math.max(...movementBuffer);
+
+    // 设置阈值
+    const baselineThreshold = 0.2;  // 基于速度的新阈值
+    const dynamicThreshold = baselineThreshold * (1 + speed/maxSpeed);
+    
+    // 步态检测逻辑
+    if (maxMovement > dynamicThreshold) {
+        if (!isRunning) consecutiveMovements++;
+        console.log('检测到跑步，连续帧数:', consecutiveMovements, '运动强度:', maxMovement.toFixed(3), '阈值:', dynamicThreshold.toFixed(3));
+        
+        if (consecutiveMovements >= 2) {
+            isRunning = true;
+            targetSpeed = Math.min(maxSpeed, targetSpeed + 0.3);
+            
+            if (now - lastStepTime > 200) {
+                stepCount++;
+                lastStepTime = now;
+                console.log('记录步数:', stepCount);
+            }
+        }
+    } else {
+        consecutiveMovements = 0;
+        if (isRunning) {
+            console.log('停止跑步');
+            isRunning = false;
+        }
+        targetSpeed = 0;
+        speed = Math.max(0, speed - 1.0);
+    }
+
+    // 更新游戏状态
+    gameState.movementQuality = Math.min(100, maxMovement / baselineThreshold * 100);
+    gameState.currentSpeed = speed;
+    gameState.stepCount = stepCount;
+    if (maxMovement > 0) {
+        gameState.debugInfo = `运动强度: ${maxMovement.toFixed(3)}, 阈值: ${dynamicThreshold.toFixed(3)}`;
+    }
+    updateGameState();
+}
