@@ -436,7 +436,10 @@ function onPoseResults(results) {
             leftShoulder: [],
             rightElbow: [],
             rightShoulder: [],
-            lastUpdateTime: now
+            leftHip: [],
+            rightHip: [],
+            lastUpdateTime: now,
+            lastArmSwingPhase: 'neutral' // 新增：记录手臂摆动相位
         };
     }
 
@@ -444,6 +447,7 @@ function onPoseResults(results) {
     const historyWindow = 300; // 300ms的时间窗口
     window.poseHistory.timestamps.push(now);
     
+    // 更新手臂和肩膀位置
     if (landmarks[KEYPOINTS.LEFT_ELBOW] && landmarks[KEYPOINTS.LEFT_SHOULDER]) {
         window.poseHistory.leftElbow.push({
             x: landmarks[KEYPOINTS.LEFT_ELBOW].x,
@@ -466,6 +470,21 @@ function onPoseResults(results) {
         });
     }
 
+    // 更新髋部位置
+    if (landmarks[KEYPOINTS.LEFT_HIP]) {
+        window.poseHistory.leftHip.push({
+            x: landmarks[KEYPOINTS.LEFT_HIP].x,
+            y: landmarks[KEYPOINTS.LEFT_HIP].y
+        });
+    }
+    
+    if (landmarks[KEYPOINTS.RIGHT_HIP]) {
+        window.poseHistory.rightHip.push({
+            x: landmarks[KEYPOINTS.RIGHT_HIP].x,
+            y: landmarks[KEYPOINTS.RIGHT_HIP].y
+        });
+    }
+
     // 保持窗口大小
     while (now - window.poseHistory.timestamps[0] > historyWindow) {
         window.poseHistory.timestamps.shift();
@@ -473,6 +492,8 @@ function onPoseResults(results) {
         window.poseHistory.leftShoulder.shift();
         window.poseHistory.rightElbow.shift();
         window.poseHistory.rightShoulder.shift();
+        window.poseHistory.leftHip.shift();
+        window.poseHistory.rightHip.shift();
     }
 
     // 计算速度矢量
@@ -491,56 +512,69 @@ function onPoseResults(results) {
 
     let totalIntensity = 0;
     let validMeasurements = 0;
+    let armSwingCoordination = 0; // 手臂协调性得分
 
-    // 计算左臂运动
-    if (window.poseHistory.leftElbow.length >= 2) {
+    // 计算左臂运动（相对于髋部）
+    if (window.poseHistory.leftElbow.length >= 2 && window.poseHistory.leftHip.length >= 2) {
         const currentIdx = window.poseHistory.leftElbow.length - 1;
         const prevIdx = currentIdx - 1;
         const timeDelta = (window.poseHistory.timestamps[currentIdx] - window.poseHistory.timestamps[prevIdx]) / 1000;
 
-        // 计算手肘相对于肩膀的运动
+        // 计算手肘相对于髋部的运动
         const currentRelative = {
-            x: window.poseHistory.leftElbow[currentIdx].x - window.poseHistory.leftShoulder[currentIdx].x,
-            y: window.poseHistory.leftElbow[currentIdx].y - window.poseHistory.leftShoulder[currentIdx].y
+            x: window.poseHistory.leftElbow[currentIdx].x - window.poseHistory.leftHip[currentIdx].x,
+            y: window.poseHistory.leftElbow[currentIdx].y - window.poseHistory.leftHip[currentIdx].y
         };
 
         const previousRelative = {
-            x: window.poseHistory.leftElbow[prevIdx].x - window.poseHistory.leftShoulder[prevIdx].x,
-            y: window.poseHistory.leftElbow[prevIdx].y - window.poseHistory.leftShoulder[prevIdx].y
+            x: window.poseHistory.leftElbow[prevIdx].x - window.poseHistory.leftHip[prevIdx].x,
+            y: window.poseHistory.leftElbow[prevIdx].y - window.poseHistory.leftHip[prevIdx].y
         };
 
         const velocity = calculateVelocity(currentRelative, previousRelative, timeDelta);
-        totalIntensity += calculateIntensity(velocity);
+        const leftArmIntensity = calculateIntensity(velocity);
+        totalIntensity += leftArmIntensity;
         validMeasurements++;
     }
 
-    // 计算右臂运动
-    if (window.poseHistory.rightElbow.length >= 2) {
+    // 计算右臂运动（相对于髋部）
+    if (window.poseHistory.rightElbow.length >= 2 && window.poseHistory.rightHip.length >= 2) {
         const currentIdx = window.poseHistory.rightElbow.length - 1;
         const prevIdx = currentIdx - 1;
         const timeDelta = (window.poseHistory.timestamps[currentIdx] - window.poseHistory.timestamps[prevIdx]) / 1000;
 
-        // 计算手肘相对于肩膀的运动
+        // 计算手肘相对于髋部的运动
         const currentRelative = {
-            x: window.poseHistory.rightElbow[currentIdx].x - window.poseHistory.rightShoulder[currentIdx].x,
-            y: window.poseHistory.rightElbow[currentIdx].y - window.poseHistory.rightShoulder[currentIdx].y
+            x: window.poseHistory.rightElbow[currentIdx].x - window.poseHistory.rightHip[currentIdx].x,
+            y: window.poseHistory.rightElbow[currentIdx].y - window.poseHistory.rightHip[currentIdx].y
         };
 
         const previousRelative = {
-            x: window.poseHistory.rightElbow[prevIdx].x - window.poseHistory.rightShoulder[prevIdx].x,
-            y: window.poseHistory.rightElbow[prevIdx].y - window.poseHistory.rightShoulder[prevIdx].y
+            x: window.poseHistory.rightElbow[prevIdx].x - window.poseHistory.rightHip[prevIdx].x,
+            y: window.poseHistory.rightElbow[prevIdx].y - window.poseHistory.rightHip[prevIdx].y
         };
 
         const velocity = calculateVelocity(currentRelative, previousRelative, timeDelta);
-        totalIntensity += calculateIntensity(velocity);
+        const rightArmIntensity = calculateIntensity(velocity);
+        totalIntensity += rightArmIntensity;
         validMeasurements++;
+
+        // 检查手臂交替摆动模式
+        const leftArmY = window.poseHistory.leftElbow[currentIdx].y;
+        const rightArmY = window.poseHistory.rightElbow[currentIdx].y;
+        
+        if (Math.abs(leftArmY - rightArmY) > 0.1) { // 手臂高度差异明显
+            const newPhase = leftArmY > rightArmY ? 'left_up' : 'right_up';
+            if (window.poseHistory.lastArmSwingPhase !== newPhase) {
+                armSwingCoordination = 1.0; // 检测到正确的交替摆动
+                window.poseHistory.lastArmSwingPhase = newPhase;
+            }
+        }
     }
 
-    // 计算平均运动强度
-    const currentMovement = validMeasurements > 0 ? totalIntensity / validMeasurements : 0;
+    // 计算平均运动强度，加入手臂协调性因子
+    const currentMovement = validMeasurements > 0 ? (totalIntensity / validMeasurements) * (0.5 + 0.5 * armSwingCoordination) : 0;
     
-    // console.log('当前运动强度:', currentMovement.toFixed(3));
-
     // 更新运动缓冲区
     movementBuffer.push(currentMovement);
     if (movementBuffer.length > 3) {
@@ -551,32 +585,40 @@ function onPoseResults(results) {
     const maxMovement = Math.max(...movementBuffer);
 
     // 设置阈值
-    const baselineThreshold = 0.2;  // 基于速度的新阈值
-    const dynamicThreshold = baselineThreshold * (1 + speed/maxSpeed);
+    const baselineThreshold = 0.15;  // 降低基准阈值
+    const noiseThreshold = 0.05;    // 新增：噪声阈值
+    const dynamicThreshold = baselineThreshold * (1 + speed/maxSpeed * 0.5); // 减小速度对阈值的影响
     
     // 步态检测逻辑
-    if (maxMovement > dynamicThreshold) {
+    if (maxMovement > dynamicThreshold && maxMovement > noiseThreshold) {
         if (!isRunning) consecutiveMovements++;
-        // console.log('检测到跑步，连续帧数:', consecutiveMovements, '运动强度:', maxMovement.toFixed(3), '阈值:', dynamicThreshold.toFixed(3));
         
         if (consecutiveMovements >= 2) {
             isRunning = true;
-            targetSpeed = Math.min(maxSpeed, targetSpeed + 0.3);
+            // 根据运动强度动态调整加速度
+            const accelerationFactor = Math.min(1.0, (maxMovement - dynamicThreshold) / dynamicThreshold);
+            targetSpeed = Math.min(maxSpeed, targetSpeed + 0.3 * accelerationFactor);
             
             if (now - lastStepTime > 200) {
                 stepCount++;
                 lastStepTime = now;
-                // console.log('记录步数:', stepCount);
             }
         }
-    } else {
+    } else if (maxMovement <= noiseThreshold) {
+        // 低于噪声阈值时快速减速
         consecutiveMovements = 0;
         if (isRunning) {
-            // console.log('停止跑步');
             isRunning = false;
         }
         targetSpeed = 0;
-        speed = Math.max(0, speed - 1.0);
+        speed = Math.max(0, speed - 1.5);
+    } else {
+        // 在噪声阈值和动态阈值之间时缓慢减速
+        consecutiveMovements = Math.max(0, consecutiveMovements - 1);
+        if (consecutiveMovements === 0 && isRunning) {
+            isRunning = false;
+        }
+        targetSpeed = Math.max(0, targetSpeed - 0.2);
     }
 
     // 更新游戏状态
