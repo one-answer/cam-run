@@ -1,7 +1,5 @@
 // 游戏状态管理
 let gameState = {
-    calibrationStatus: '未校准',
-    detectionMode: '等待检测',
     movementQuality: 0,
     currentSpeed: 0,
     stepCount: 0,
@@ -24,12 +22,16 @@ function updateGameState() {
                         'status-error';
 
     // 更新状态显示
+    const fpsElement = document.getElementById('fpsValue');
     const stateHtml = `
-        <h3>游戏状态</h3>
-        <p>校准状态: ${gameState.calibrationStatus}</p>
-        <p>检测模式: ${gameState.detectionMode}</p>
+        <h3>游戏状态 (FPS: <span>${fpsElement.textContent || 0}</span>)</h3>
         <p>动作质量: <span class="${qualityClass}">${qualityScore.toFixed(1)}%</span></p>
-        <p>当前速度: ${gameState.currentSpeed.toFixed(1)} m/s</p>
+        <p>当前速度: ${gameState.currentSpeed.toFixed(1)} m/s ${
+            gameState.currentSpeed === 0 ? '(等待开始跑步...)' :
+            gameState.currentSpeed < 5 * 0.3 ? '(慢跑中...)' :
+            gameState.currentSpeed < 5 * 0.7 ? '(跑步中...)' :
+            '(冲刺中！)'
+        }</p>
         <p>步数: ${gameState.stepCount}</p>
         ${gameState.debugInfo ? `<p>调试信息: ${gameState.debugInfo}</p>` : ''}
     `;
@@ -74,8 +76,6 @@ let isDetecting = false;
 async function init() {
     try {
         // 重置游戏状态
-        gameState.calibrationStatus = '待校准';
-        gameState.detectionMode = '等待检测';
         gameState.movementQuality = 0;
         gameState.currentSpeed = 0;
         gameState.stepCount = 0;
@@ -198,26 +198,9 @@ async function init() {
         video.srcObject = stream;
         video.onloadedmetadata = () => {
             video.play();
-            detectPose();  // 启动检测循环，但默认不会检测
-            stopDetection(); // 初始状态设置为不检测
+            detectPose();  // 启动检测循环
+            isDetecting = true; // 开始检测
         };
-
-        // 在 init 函数中修改按钮创建和事件绑定代码
-        const calibrateBtn = document.createElement('button');
-        calibrateBtn.id = 'calibrateBtn';
-        calibrateBtn.textContent = '开始校准';
-        calibrateBtn.style.position = 'fixed';
-        calibrateBtn.style.top = '20px';
-        calibrateBtn.style.right = '20px';
-
-        // 立即绑定点击事件
-        calibrateBtn.addEventListener('click', () => {
-            console.log('点击校准按钮'); // 调试日志
-            startCalibration();
-        });
-
-        document.body.appendChild(calibrateBtn);
-        console.log('校准按钮已创建并添加到DOM'); // 调试日志
 
         // 开始动画循环
         animate();
@@ -228,30 +211,10 @@ async function init() {
     }
 }
 
-// 添加校准触发函数
-function startCalibration() {
-    if (gameState.calibrationStatus === '校准完成') return;
-    
-    console.log('开始校准...'); // 添加调试信息
-    gameState.calibrationStatus = '校准中';
-    gameState.debugInfo = '请保持站立姿势2秒';
-    updateGameState();
-    console.log('校准状态已更新:', gameState.calibrationStatus); // 添加调试信息
-    
-    calibrationData = {
-        samples: [],
-        sampleCount: 30, // 2秒数据（假设30fps）
-        keyPoints: {}
-    };
-
-    // 开始检测
-    isDetecting = true;
-}
-
 // 添加停止检测函数
 function stopDetection() {
     isDetecting = false;
-    gameState.debugInfo = '点击开始校准按钮开始';
+    gameState.debugInfo = '';
     updateGameState();
 }
 
@@ -434,7 +397,7 @@ function getAngle(a, b, c) {
 
 function onPoseResults(results) {
     if (!results || !results.poseLandmarks) {
-        console.log('未检测到姿势');
+        // console.log('未检测到姿势');
         targetSpeed = 0; // 直接停止
         isRunning = false;
         consecutiveMovements = 0;
@@ -445,10 +408,10 @@ function onPoseResults(results) {
 
     const landmarks = results.poseLandmarks;
     if (!Array.isArray(landmarks)) {
-        console.error('姿势关键点格式错误');
+        // console.error('姿势关键点格式错误');
         return;
     }
-    console.log('检测到的关键点:', landmarks); // 添加调试信息
+    // console.log('检测到的关键点:', landmarks); // 添加调试信息
     let KEYPOINTS = {
         LEFT_HIP: 23,
         RIGHT_HIP: 24,
@@ -576,7 +539,7 @@ function onPoseResults(results) {
     // 计算平均运动强度
     const currentMovement = validMeasurements > 0 ? totalIntensity / validMeasurements : 0;
     
-    console.log('当前运动强度:', currentMovement.toFixed(3));
+    // console.log('当前运动强度:', currentMovement.toFixed(3));
 
     // 更新运动缓冲区
     movementBuffer.push(currentMovement);
@@ -594,7 +557,7 @@ function onPoseResults(results) {
     // 步态检测逻辑
     if (maxMovement > dynamicThreshold) {
         if (!isRunning) consecutiveMovements++;
-        console.log('检测到跑步，连续帧数:', consecutiveMovements, '运动强度:', maxMovement.toFixed(3), '阈值:', dynamicThreshold.toFixed(3));
+        // console.log('检测到跑步，连续帧数:', consecutiveMovements, '运动强度:', maxMovement.toFixed(3), '阈值:', dynamicThreshold.toFixed(3));
         
         if (consecutiveMovements >= 2) {
             isRunning = true;
@@ -603,13 +566,13 @@ function onPoseResults(results) {
             if (now - lastStepTime > 200) {
                 stepCount++;
                 lastStepTime = now;
-                console.log('记录步数:', stepCount);
+                // console.log('记录步数:', stepCount);
             }
         }
     } else {
         consecutiveMovements = 0;
         if (isRunning) {
-            console.log('停止跑步');
+            // console.log('停止跑步');
             isRunning = false;
         }
         targetSpeed = 0;
