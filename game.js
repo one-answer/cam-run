@@ -73,6 +73,25 @@ const requiredConsecutiveMovements = 3;
 // 添加检测状态控制
 let isDetecting = false;
 
+// 添加阴影渲染相关变量
+let shadowCanvas, shadowCtx;
+let lastSegmentationData = null;
+
+// 添加 BodyPix 相关变量
+let bodyPixNet;
+let lastShadowUpdate = 0;
+const SHADOW_UPDATE_INTERVAL = 1000 / 15; // 降低到15fps以减轻CPU负担
+const SEGMENTATION_UPDATE_INTERVAL = 1000 / 10; // 分割更新频率更低
+
+// 添加位置平滑相关变量
+let lastPositionsShadow = {
+    left: null,
+    right: null,
+    top: null,
+    bottom: null
+};
+const smoothingFactor = 0.3; // 平滑系数，值越小越平滑
+
 async function init() {
     try {
         // 重置游戏状态
@@ -81,6 +100,26 @@ async function init() {
         gameState.stepCount = 0;
         gameState.debugInfo = '准备开始...';
         updateGameState();
+
+        // 初始化 BodyPix，使用平衡的配置
+        bodyPixNet = await bodyPix.load({
+            architecture: 'MobileNetV1',
+            outputStride: 16,
+            multiplier: 0.75,
+            quantBytes: 2,
+            internalResolution: 0.5
+        });
+
+        // 初始化阴影画布
+        shadowCanvas = document.createElement('canvas');
+        shadowCanvas.id = 'shadowCanvas';
+        shadowCanvas.width = 400;
+        shadowCanvas.height = 160;
+        shadowCtx = shadowCanvas.getContext('2d', {
+            willReadFrequently: false,
+            alpha: true
+        });
+        document.getElementById('shadowContainer').appendChild(shadowCanvas);
 
         // 设置Three.js场景
         scene = new THREE.Scene();
@@ -395,37 +434,135 @@ function getAngle(a, b, c) {
     return Math.acos(clampedCosTheta) * (180/Math.PI);
 }
 
+async function updateShadow(video) {
+    const now = performance.now();
+    
+    try {
+        // 分割更新使用更低的频率
+        if (now - lastShadowUpdate >= SEGMENTATION_UPDATE_INTERVAL) {
+            const segmentation = await bodyPixNet.segmentPerson(video, {
+                flipHorizontal: false,
+                internalResolution: 'medium',
+                segmentationThreshold: 0.5,
+                maxDetections: 1,
+                scoreThreshold: 0.4,
+                nmsRadius: 15
+            });
+            
+            lastSegmentationData = segmentation;
+            lastShadowUpdate = now;
+        }
+
+        // 如果没有分割数据，直接返回
+        if (!lastSegmentationData) return;
+
+        // 使用更低频率更新画布显示
+        if (now % SHADOW_UPDATE_INTERVAL < 16) { // 仅在合适的时间更新显示
+            // 清除画布
+            shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+
+            // 重用临时画布
+            if (!this.tempCanvas) {
+                this.tempCanvas = document.createElement('canvas');
+                this.tempCanvas.width = video.videoWidth;
+                this.tempCanvas.height = video.videoHeight;
+                this.tempCtx = this.tempCanvas.getContext('2d', {
+                    alpha: false,
+                    willReadFrequently: false
+                });
+            }
+            const tempCanvas = this.tempCanvas;
+            const tempCtx = this.tempCtx;
+            
+            // 使用优化的像素处理方法
+            const imageData = tempCtx.createImageData(tempCanvas.width, tempCanvas.height);
+            const segmentationData = lastSegmentationData.data;
+            
+            // 使用 Uint32Array 进行更快的像素操作
+            const uint32View = new Uint32Array(imageData.data.buffer);
+            const shadowColor = 0xB4000000; // RGBA: (0, 0, 0, 180)
+            
+            // 计算边界框
+            let left = tempCanvas.width, right = 0;
+            let top = tempCanvas.height, bottom = 0;
+            
+            // 优化的像素处理和边界框计算
+            for (let i = 0; i < segmentationData.length; i++) {
+                if (segmentationData[i]) {
+                    uint32View[i] = shadowColor;
+                    const x = i % tempCanvas.width;
+                    const y = Math.floor(i / tempCanvas.width);
+                    left = Math.min(left, x);
+                    right = Math.max(right, x);
+                    top = Math.min(top, y);
+                    bottom = Math.max(bottom, y);
+                }
+            }
+            
+            tempCtx.putImageData(imageData, 0, 0);
+
+            // 应用位置平滑
+            if (lastPositionsShadow.left !== null) {
+                left = lastPositionsShadow.left + (left - lastPositionsShadow.left) * smoothingFactor;
+                right = lastPositionsShadow.right + (right - lastPositionsShadow.right) * smoothingFactor;
+                top = lastPositionsShadow.top + (top - lastPositionsShadow.top) * smoothingFactor;
+                bottom = lastPositionsShadow.bottom + (bottom - lastPositionsShadow.bottom) * smoothingFactor;
+            }
+
+            lastPositionsShadow = { left, right, top, bottom };
+
+            // 计算缩放和位置
+            const personWidth = right - left;
+            const personHeight = bottom - top;
+            const scale = Math.min(
+                shadowCanvas.width / personWidth * 0.8,
+                shadowCanvas.height / personHeight * 0.8
+            );
+
+            // 在阴影画布上绘制
+            shadowCtx.save();
+            
+            // 优化的模糊效果
+            shadowCtx.filter = 'blur(3px)';
+            
+            // 水平翻转
+            shadowCtx.translate(shadowCanvas.width, 0);
+            shadowCtx.scale(-1, 1);
+
+            // 使用整数坐标避免子像素渲染
+            const destWidth = Math.round(personWidth * scale);
+            const destHeight = Math.round(personHeight * scale);
+            const destX = Math.round((shadowCanvas.width - destWidth) / 2);
+            const destY = Math.round((shadowCanvas.height - destHeight) / 2);
+
+            // 优化图像质量设置
+            shadowCtx.imageSmoothingEnabled = true;
+            shadowCtx.imageSmoothingQuality = 'high';
+
+            shadowCtx.drawImage(
+                tempCanvas,
+                Math.round(left), Math.round(top), 
+                Math.round(personWidth), Math.round(personHeight),
+                destX, destY, 
+                destWidth, destHeight
+            );
+
+            shadowCtx.restore();
+        }
+    } catch (error) {
+        console.error('Error updating shadow:', error);
+    }
+}
+
 function onPoseResults(results) {
-    if (!results || !results.poseLandmarks) {
-        // console.log('未检测到姿势');
-        targetSpeed = 0; // 直接停止
-        isRunning = false;
-        consecutiveMovements = 0;
-        gameState.debugInfo = '未检测到姿势';
-        updateGameState();
+    if (!results.poseLandmarks) {
         return;
     }
 
-    const landmarks = results.poseLandmarks;
-    if (!Array.isArray(landmarks)) {
-        // console.error('姿势关键点格式错误');
-        return;
-    }
-    // console.log('检测到的关键点:', landmarks); // 添加调试信息
-    let KEYPOINTS = {
-        LEFT_HIP: 23,
-        RIGHT_HIP: 24,
-        LEFT_KNEE: 25,
-        RIGHT_KNEE: 26,
-        LEFT_ANKLE: 27,
-        RIGHT_ANKLE: 28,
-        LEFT_SHOULDER: 11,
-        RIGHT_SHOULDER: 12,
-        LEFT_ELBOW: 13,
-        RIGHT_ELBOW: 14
-    };
-    
-    // 计算手臂运动
+    // 更新人物阴影
+    const video = document.getElementById('webcamView');
+    updateShadow(video);
+
     const now = Date.now();
     
     // 初始化历史记录
@@ -448,40 +585,40 @@ function onPoseResults(results) {
     window.poseHistory.timestamps.push(now);
     
     // 更新手臂和肩膀位置
-    if (landmarks[KEYPOINTS.LEFT_ELBOW] && landmarks[KEYPOINTS.LEFT_SHOULDER]) {
+    if (results.poseLandmarks[11] && results.poseLandmarks[13]) {
         window.poseHistory.leftElbow.push({
-            x: landmarks[KEYPOINTS.LEFT_ELBOW].x,
-            y: landmarks[KEYPOINTS.LEFT_ELBOW].y
+            x: results.poseLandmarks[13].x,
+            y: results.poseLandmarks[13].y
         });
         window.poseHistory.leftShoulder.push({
-            x: landmarks[KEYPOINTS.LEFT_SHOULDER].x,
-            y: landmarks[KEYPOINTS.LEFT_SHOULDER].y
+            x: results.poseLandmarks[11].x,
+            y: results.poseLandmarks[11].y
         });
     }
     
-    if (landmarks[KEYPOINTS.RIGHT_ELBOW] && landmarks[KEYPOINTS.RIGHT_SHOULDER]) {
+    if (results.poseLandmarks[12] && results.poseLandmarks[14]) {
         window.poseHistory.rightElbow.push({
-            x: landmarks[KEYPOINTS.RIGHT_ELBOW].x,
-            y: landmarks[KEYPOINTS.RIGHT_ELBOW].y
+            x: results.poseLandmarks[14].x,
+            y: results.poseLandmarks[14].y
         });
         window.poseHistory.rightShoulder.push({
-            x: landmarks[KEYPOINTS.RIGHT_SHOULDER].x,
-            y: landmarks[KEYPOINTS.RIGHT_SHOULDER].y
+            x: results.poseLandmarks[12].x,
+            y: results.poseLandmarks[12].y
         });
     }
 
     // 更新髋部位置
-    if (landmarks[KEYPOINTS.LEFT_HIP]) {
+    if (results.poseLandmarks[23]) {
         window.poseHistory.leftHip.push({
-            x: landmarks[KEYPOINTS.LEFT_HIP].x,
-            y: landmarks[KEYPOINTS.LEFT_HIP].y
+            x: results.poseLandmarks[23].x,
+            y: results.poseLandmarks[23].y
         });
     }
     
-    if (landmarks[KEYPOINTS.RIGHT_HIP]) {
+    if (results.poseLandmarks[24]) {
         window.poseHistory.rightHip.push({
-            x: landmarks[KEYPOINTS.RIGHT_HIP].x,
-            y: landmarks[KEYPOINTS.RIGHT_HIP].y
+            x: results.poseLandmarks[24].x,
+            y: results.poseLandmarks[24].y
         });
     }
 
@@ -519,35 +656,35 @@ function onPoseResults(results) {
     const checkRunningPose = (landmarks) => {
         // 检查上半身是否可见（肩膀必须可见）
         const shouldersVisible = checkVisibility(landmarks, [
-            KEYPOINTS.LEFT_SHOULDER,
-            KEYPOINTS.RIGHT_SHOULDER
+            11,
+            12
         ]);
 
         // 检查髋部是否可见（不强制要求）
         const hipsVisible = checkVisibility(landmarks, [
-            KEYPOINTS.LEFT_HIP,
-            KEYPOINTS.RIGHT_HIP
+            23,
+            24
         ]);
 
         // 至少需要一个完整的手臂可见
         const leftArmVisible = checkVisibility(landmarks, [
-            KEYPOINTS.LEFT_SHOULDER,
-            KEYPOINTS.LEFT_ELBOW
+            11,
+            13
         ]);
 
         const rightArmVisible = checkVisibility(landmarks, [
-            KEYPOINTS.RIGHT_SHOULDER,
-            KEYPOINTS.RIGHT_ELBOW
+            12,
+            14
         ]);
 
         // 检查是否处于站立/跑步姿势
         let isStandingPose = true; // 默认为true
         if (hipsVisible) {
             // 如果髋部可见，则检查躯干垂直度
-            const leftShoulderY = landmarks[KEYPOINTS.LEFT_SHOULDER].y;
-            const leftHipY = landmarks[KEYPOINTS.LEFT_HIP].y;
-            const rightShoulderY = landmarks[KEYPOINTS.RIGHT_SHOULDER].y;
-            const rightHipY = landmarks[KEYPOINTS.RIGHT_HIP].y;
+            const leftShoulderY = landmarks[11].y;
+            const leftHipY = landmarks[23].y;
+            const rightShoulderY = landmarks[12].y;
+            const rightHipY = landmarks[24].y;
             
             // 计算躯干与垂直线的夹角
             const torsoAngleLeft = Math.abs(Math.atan2(leftHipY - leftShoulderY, 0.001));
@@ -559,8 +696,8 @@ function onPoseResults(results) {
                             averageTorsoAngle < Math.PI/2 + Math.PI/9;
         } else {
             // 如果髋部不可见，通过肩膀的水平对齐程度来判断是否站立
-            const shoulderYDiff = Math.abs(landmarks[KEYPOINTS.LEFT_SHOULDER].y - 
-                                         landmarks[KEYPOINTS.RIGHT_SHOULDER].y);
+            const shoulderYDiff = Math.abs(landmarks[11].y - 
+                                         landmarks[12].y);
             // 如果肩膀高度差异不大，认为是站立姿势
             isStandingPose = shoulderYDiff < 0.1;
         }
@@ -583,7 +720,7 @@ function onPoseResults(results) {
     let armSwingCoordination = 0;
 
     // 检查姿势是否有效
-    const poseStatus = checkRunningPose(landmarks);
+    const poseStatus = checkRunningPose(results.poseLandmarks);
     
     if (!poseStatus.isValid) {
         // 如果姿势无效，直接停止
@@ -706,8 +843,10 @@ function onPoseResults(results) {
         
         if (consecutiveMovements >= 2) {
             isRunning = true;
-            const accelerationFactor = Math.min(1.0, (maxMovement - dynamicThreshold) / dynamicThreshold);
-            targetSpeed = Math.min(maxSpeed, targetSpeed + 0.3 * accelerationFactor);
+            // 改进加速度计算，使其更平滑且与运动强度更相关
+            const accelerationFactor = Math.min(1.5, (maxMovement - dynamicThreshold) / dynamicThreshold);
+            // 提高最大速度增量，同时保持平滑过渡
+            targetSpeed = Math.min(maxSpeed, targetSpeed + 0.5 * accelerationFactor);
             
             if (now - lastStepTime > 200) {
                 stepCount++;
@@ -720,13 +859,15 @@ function onPoseResults(results) {
             isRunning = false;
         }
         targetSpeed = 0;
-        speed = Math.max(0, speed - 1.5);
+        // 增加减速率，使停止更自然
+        speed = Math.max(0, speed - 2.0);
     } else {
         consecutiveMovements = Math.max(0, consecutiveMovements - 1);
         if (consecutiveMovements === 0 && isRunning) {
             isRunning = false;
         }
-        targetSpeed = Math.max(0, targetSpeed - 0.2);
+        // 更平滑的减速
+        targetSpeed = Math.max(0, targetSpeed - 0.3);
     }
 
     // 更新游戏状态
