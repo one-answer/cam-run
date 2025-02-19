@@ -480,7 +480,7 @@ async function updateShadow(video, poseResults) {
                 
                 // 绘制头部阴影
                 if (landmarks[0]) { // 鼻子关键点
-                    const headX = landmarks[0].x * shadowCanvas.width;
+                    const headX = (1 - landmarks[0].x) * shadowCanvas.width;
                     const headY = landmarks[0].y * shadowCanvas.height;
                     const headRadius = shadowCanvas.width * 0.08; // 增大头部阴影大小
                     
@@ -499,7 +499,7 @@ async function updateShadow(video, poseResults) {
                 
                 // 绘制躯干阴影
                 if (landmarks[11] && landmarks[12] && landmarks[23] && landmarks[24]) {
-                    const torsoX = (landmarks[11].x + landmarks[12].x + landmarks[23].x + landmarks[24].x) / 4 * shadowCanvas.width;
+                    const torsoX = (1 - (landmarks[11].x + landmarks[12].x + landmarks[23].x + landmarks[24].x) / 4) * shadowCanvas.width;
                     const torsoY = (landmarks[11].y + landmarks[12].y + landmarks[23].y + landmarks[24].y) / 4 * shadowCanvas.height;
                     const torsoWidth = Math.abs(landmarks[11].x - landmarks[12].x) * shadowCanvas.width;
                     const torsoHeight = Math.abs(landmarks[11].y - landmarks[24].y) * shadowCanvas.height;
@@ -521,11 +521,11 @@ async function updateShadow(video, poseResults) {
                 const drawLimbShadow = (start, mid, end) => {
                     if (!landmarks[start] || !landmarks[mid] || !landmarks[end]) return;
                     
-                    const startX = landmarks[start].x * shadowCanvas.width;
+                    const startX = (1 - landmarks[start].x) * shadowCanvas.width;
                     const startY = landmarks[start].y * shadowCanvas.height;
-                    const midX = landmarks[mid].x * shadowCanvas.width;
+                    const midX = (1 - landmarks[mid].x) * shadowCanvas.width;
                     const midY = landmarks[mid].y * shadowCanvas.height;
-                    const endX = landmarks[end].x * shadowCanvas.width;
+                    const endX = (1 - landmarks[end].x) * shadowCanvas.width;
                     const endY = landmarks[end].y * shadowCanvas.height;
                     
                     // 绘制关节连接处的阴影
