@@ -48,6 +48,10 @@ const maxSpeed = 5;
 const acceleration = 0.1;
 const deceleration = 0.05;
 
+// 添加视锥体相关变量
+let projScreenMatrix = new THREE.Matrix4();
+let frustum = new THREE.Frustum();
+
 // 初始化MediaPipe
 let pose;
 let lastPositions = {
@@ -157,10 +161,19 @@ async function init() {
         // 设置渲染器
         renderer = new THREE.WebGLRenderer({ 
             canvas: document.getElementById('gameCanvas'),
-            antialias: true 
+            antialias: true,
+            powerPreference: 'high-performance',
+            precision: 'mediump'
         });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        // 限制设备像素比以降低GPU负载
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        // 启用渲染器的性能优化
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // 设置视锥体剔除
+        const frustum = new THREE.Frustum();
+        const projScreenMatrix = new THREE.Matrix4();
 
         // 添加环境光和平行光
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -177,10 +190,16 @@ async function init() {
             decorations: [],
             segmentLength: 1000,
             segmentWidth: 100,
-            activeSegments: 3,
-            decorationsPerSegment: 20,
-            maxDecorationsPool: 100,
-            lastGeneratedZ: 0
+            activeSegments: 5,
+            decorationsPerSegment: 30,    // 减少每段的装饰物数量，但确保密度适中
+            maxDecorationsPool: 500,      // 保持合理的池大小
+            lastGeneratedZ: 0,
+            decorationSpawnRange: {        // 添加装饰物生成范围控制
+                minX: -60,
+                maxX: 60,
+                minZ: 0,
+                maxZ: 1000
+            }
         };
 
         // 创建地面材质
@@ -220,15 +239,31 @@ async function init() {
 
             // 为每个地形段添加装饰物
             for (let j = 0; j < terrainSystem.decorationsPerSegment; j++) {
-                const decoration = decorationPool[decorationPool.length - 1];
-                decorationPool.pop();
-                decoration.visible = true;
-                decoration.position.set(
-                    Math.random() * 80 - 40,
-                    1,
-                    i * terrainSystem.segmentLength + Math.random() * terrainSystem.segmentLength
-                );
-                terrainSystem.decorations.push(decoration);
+                if (decorationPool.length > 0) {
+                    const decoration = decorationPool.pop();
+                    decoration.visible = true;
+
+                    // 在地形段范围内均匀分布装饰物
+                    const segmentProgress = j / terrainSystem.decorationsPerSegment; // 0到1之间的进度
+                    const position = new THREE.Vector3(
+                        Math.random() * (terrainSystem.decorationSpawnRange.maxX - terrainSystem.decorationSpawnRange.minX) + terrainSystem.decorationSpawnRange.minX,
+                        1,
+                        i * terrainSystem.segmentLength + segmentProgress * terrainSystem.segmentLength
+                    );
+                    decoration.position.copy(position);
+                    
+                    // 根据初始距离设置LOD
+                    const distance = position.distanceTo(camera.position);
+                    if (distance > 1500) {
+                        decoration.scale.set(0.3, 0.3, 0.3);
+                    } else if (distance > 800) {
+                        decoration.scale.set(0.6, 0.6, 0.6);
+                    } else {
+                        decoration.scale.set(1, 1, 1);
+                    }
+
+                    terrainSystem.decorations.push(decoration);
+                }
             }
         }
 
@@ -312,6 +347,13 @@ function updateFPS() {
 function animate() {
     requestAnimationFrame(animate);
     
+    // 更新视锥体
+    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    frustum.setFromProjectionMatrix(projScreenMatrix);
+    
+    // 优化渲染性能
+    const cameraPosition = camera.position.clone();
+    
     // 平滑速度变化
     if (Math.abs(speed - targetSpeed) > 0.01) {
         if (speed < targetSpeed) {
@@ -350,10 +392,67 @@ function animate() {
         const moveStep = speed * 0.5; // 降低移动速度
         camera.position.z += moveStep;
         
-        // 获取地形系统
+        // 获取地形系统和装饰物池
         const terrainSystem = window.terrainSystem;
         const decorationPool = window.decorationPool;
         const cameraZ = camera.position.z;
+
+        if (!terrainSystem || !decorationPool) {
+            console.error('地形系统或装饰物池未初始化');
+            return;
+        }
+
+        // 每帧检查和管理装饰物
+        const decorationsToRecycle = terrainSystem.decorations.filter(d => {
+            const distance = d.position.distanceTo(cameraPosition);
+            // 只回收在相机后方很远的装饰物
+            return d.position.z < cameraZ - terrainSystem.segmentLength * 2;
+        });
+        
+        // 回收装饰物
+        decorationsToRecycle.forEach(decoration => {
+            decoration.visible = false;
+            decorationPool.push(decoration);
+        });
+        terrainSystem.decorations = terrainSystem.decorations.filter(d => !decorationsToRecycle.includes(d));
+
+        // 确保始终保持足够的装饰物在场景中
+        const minDecorationCount = terrainSystem.decorationsPerSegment * terrainSystem.activeSegments;
+        if (terrainSystem.decorations.length < minDecorationCount && decorationPool.length > 0) {
+            // 计算需要生成的装饰物数量
+            const numToAdd = Math.min(
+                Math.ceil((minDecorationCount - terrainSystem.decorations.length) * 0.3),
+                decorationPool.length,
+                15
+            );
+            
+            // 在相机前方生成新的装饰物
+            for (let i = 0; i < numToAdd; i++) {
+                const decoration = decorationPool.pop();
+                decoration.visible = true;
+                
+                // 在相机前方1-2个段的范围内生成装饰物
+                const segmentOffset = 1 + Math.random();
+                const position = new THREE.Vector3(
+                    Math.random() * (terrainSystem.decorationSpawnRange.maxX - terrainSystem.decorationSpawnRange.minX) + terrainSystem.decorationSpawnRange.minX,
+                    1,
+                    cameraZ + terrainSystem.segmentLength * segmentOffset
+                );
+                decoration.position.copy(position);
+                
+                // 根据距离设置LOD
+                const distance = position.distanceTo(cameraPosition);
+                if (distance > 1500) {
+                    decoration.scale.set(0.3, 0.3, 0.3);
+                } else if (distance > 800) {
+                    decoration.scale.set(0.6, 0.6, 0.6);
+                } else {
+                    decoration.scale.set(1, 1, 1);
+                }
+                
+                terrainSystem.decorations.push(decoration);
+            }
+        }
         
         // 检查是否需要生成新的地形段
         if (cameraZ + terrainSystem.segmentLength > terrainSystem.lastGeneratedZ - terrainSystem.segmentLength) {
@@ -362,33 +461,38 @@ function animate() {
             oldGround.position.z = terrainSystem.lastGeneratedZ;
             terrainSystem.grounds.push(oldGround);
             
-            // 回收和重新生成装饰物
-            const decorationsToRecycle = terrainSystem.decorations.filter(
-                d => d.position.z < cameraZ - terrainSystem.segmentLength
-            );
-            
-            decorationsToRecycle.forEach(decoration => {
-                decoration.visible = false;
-                decorationPool.push(decoration);
-                terrainSystem.decorations = terrainSystem.decorations.filter(d => d !== decoration);
-            });
-            
-            // 在新地形段添加装饰物
-            for (let i = 0; i < terrainSystem.decorationsPerSegment; i++) {
-                if (decorationPool.length > 0) {
-                    const decoration = decorationPool.pop();
-                    decoration.visible = true;
-                    decoration.position.set(
-                        Math.random() * 80 - 40,
-                        1,
-                        terrainSystem.lastGeneratedZ + Math.random() * terrainSystem.segmentLength
-                    );
-                    terrainSystem.decorations.push(decoration);
-                }
-            }
-            
             // 更新最后生成的Z坐标
             terrainSystem.lastGeneratedZ += terrainSystem.segmentLength;
+            
+            // 在新地形段添加额外的装饰物
+            const newSegmentDecorations = Math.floor(terrainSystem.decorationsPerSegment * 1.5);
+            
+            // 在新地形段范围内生成装饰物
+            for (let i = 0; i < newSegmentDecorations && decorationPool.length > 0; i++) {
+                const decoration = decorationPool.pop();
+                decoration.visible = true;
+                
+                // 在新地形段范围内均匀分布装饰物
+                const segmentProgress = i / newSegmentDecorations;
+                const position = new THREE.Vector3(
+                    Math.random() * (terrainSystem.decorationSpawnRange.maxX - terrainSystem.decorationSpawnRange.minX) + terrainSystem.decorationSpawnRange.minX,
+                    1,
+                    terrainSystem.lastGeneratedZ - terrainSystem.segmentLength + segmentProgress * terrainSystem.segmentLength
+                );
+                decoration.position.copy(position);
+                
+                // 根据距离设置LOD
+                const distance = position.distanceTo(cameraPosition);
+                if (distance > 1500) {
+                    decoration.scale.set(0.3, 0.3, 0.3);
+                } else if (distance > 800) {
+                    decoration.scale.set(0.6, 0.6, 0.6);
+                } else {
+                    decoration.scale.set(1, 1, 1);
+                }
+                
+                terrainSystem.decorations.push(decoration);
+            }
         }
         
         // 添加更自然的相机摇晃效果
