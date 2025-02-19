@@ -70,27 +70,55 @@ const bufferSize = 5;
 let consecutiveMovements = 0;
 const requiredConsecutiveMovements = 3;
 
-// 添加检测状态控制
-let isDetecting = false;
-
-// 添加阴影渲染相关变量
-let shadowCanvas, shadowCtx;
-let lastSegmentationData = null;
-
-// 添加 BodyPix 相关变量
-let bodyPixNet;
+// 阴影渲染相关配置
+const SHADOW_UPDATE_INTERVAL = 1000 / 30; // 30fps
+const SHADOW_OPACITY = 0.6;
+const SHADOW_BLUR = 8;
 let lastShadowUpdate = 0;
-const SHADOW_UPDATE_INTERVAL = 1000 / 15; // 降低到15fps以减轻CPU负担
-const SEGMENTATION_UPDATE_INTERVAL = 1000 / 10; // 分割更新频率更低
-
-// 添加位置平滑相关变量
 let lastPositionsShadow = {
     left: null,
     right: null,
     top: null,
     bottom: null
 };
-const smoothingFactor = 0.3; // 平滑系数，值越小越平滑
+const smoothingFactor = 0.3; // 阴影平滑因子
+
+// 添加检测状态控制
+let isDetecting = false;
+
+// 添加骨架绘制相关变量
+let skeletonCanvas, skeletonCtx;
+let shadowCanvas, shadowCtx; // 添加阴影画布变量
+const POSE_CONNECTIONS = [
+    // 躯干
+    [11, 12], // 肩膀
+    [11, 23], // 左肩到左髋
+    [12, 24], // 右肩到右髋
+    [23, 24], // 髋部
+    
+    // 左臂
+    [11, 13], // 左肩到左肘
+    [13, 15], // 左肘到左腕
+    
+    // 右臂
+    [12, 14], // 右肩到右肘
+    [14, 16], // 右肘到右腕
+    
+    // 左腿
+    [23, 25], // 左髋到左膝
+    [25, 27], // 左膝到左踝
+    
+    // 右腿
+    [24, 26], // 右髋到右膝
+    [26, 28]  // 右膝到右踝
+];
+
+// 骨架绘制样式
+const skeletonStyle = {
+    color: '#00ff00',
+    lineWidth: 2,
+    radius: 4
+}
 
 async function init() {
     try {
@@ -101,25 +129,23 @@ async function init() {
         gameState.debugInfo = '准备开始...';
         updateGameState();
 
-        // 初始化 BodyPix，使用平衡的配置
-        bodyPixNet = await bodyPix.load({
-            architecture: 'MobileNetV1',
-            outputStride: 16,
-            multiplier: 0.75,
-            quantBytes: 2,
-            internalResolution: 0.5
-        });
+        // 初始化骨架绘制画布
+        skeletonCanvas = document.getElementById('skeletonCanvas');
+        skeletonCtx = skeletonCanvas.getContext('2d');
+        skeletonCanvas.width = 320;
+        skeletonCanvas.height = 240;
 
         // 初始化阴影画布
         shadowCanvas = document.createElement('canvas');
-        shadowCanvas.id = 'shadowCanvas';
-        shadowCanvas.width = 400;
-        shadowCanvas.height = 160;
-        shadowCtx = shadowCanvas.getContext('2d', {
-            willReadFrequently: false,
-            alpha: true
-        });
-        document.getElementById('shadowContainer').appendChild(shadowCanvas);
+        shadowCanvas.width = 320;
+        shadowCanvas.height = 240;
+        shadowCanvas.style.position = 'fixed';
+        shadowCanvas.style.bottom = '10px';
+        shadowCanvas.style.left = '50%';
+        shadowCanvas.style.transform = 'translateX(-50%)';
+        shadowCanvas.style.zIndex = '99';
+        document.body.appendChild(shadowCanvas);
+        shadowCtx = shadowCanvas.getContext('2d');
 
         // 设置Three.js场景
         scene = new THREE.Scene();
@@ -434,120 +460,105 @@ function getAngle(a, b, c) {
     return Math.acos(clampedCosTheta) * (180/Math.PI);
 }
 
-async function updateShadow(video) {
+async function updateShadow(video, poseResults) {
     const now = performance.now();
     
     try {
-        // 分割更新使用更低的频率
-        if (now - lastShadowUpdate >= SEGMENTATION_UPDATE_INTERVAL) {
-            const segmentation = await bodyPixNet.segmentPerson(video, {
-                flipHorizontal: false,
-                internalResolution: 'medium',
-                segmentationThreshold: 0.5,
-                maxDetections: 1,
-                scoreThreshold: 0.4,
-                nmsRadius: 15
-            });
-            
-            lastSegmentationData = segmentation;
-            lastShadowUpdate = now;
-        }
-
-        // 如果没有分割数据，直接返回
-        if (!lastSegmentationData) return;
-
-        // 使用更低频率更新画布显示
-        if (now % SHADOW_UPDATE_INTERVAL < 16) { // 仅在合适的时间更新显示
-            // 清除画布
-            shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
-
-            // 重用临时画布
-            if (!this.tempCanvas) {
-                this.tempCanvas = document.createElement('canvas');
-                this.tempCanvas.width = video.videoWidth;
-                this.tempCanvas.height = video.videoHeight;
-                this.tempCtx = this.tempCanvas.getContext('2d', {
-                    alpha: false,
-                    willReadFrequently: false
-                });
-            }
-            const tempCanvas = this.tempCanvas;
-            const tempCtx = this.tempCtx;
-            
-            // 使用优化的像素处理方法
-            const imageData = tempCtx.createImageData(tempCanvas.width, tempCanvas.height);
-            const segmentationData = lastSegmentationData.data;
-            
-            // 使用 Uint32Array 进行更快的像素操作
-            const uint32View = new Uint32Array(imageData.data.buffer);
-            const shadowColor = 0xB4000000; // RGBA: (0, 0, 0, 180)
-            
-            // 计算边界框
-            let left = tempCanvas.width, right = 0;
-            let top = tempCanvas.height, bottom = 0;
-            
-            // 优化的像素处理和边界框计算
-            for (let i = 0; i < segmentationData.length; i++) {
-                if (segmentationData[i]) {
-                    uint32View[i] = shadowColor;
-                    const x = i % tempCanvas.width;
-                    const y = Math.floor(i / tempCanvas.width);
-                    left = Math.min(left, x);
-                    right = Math.max(right, x);
-                    top = Math.min(top, y);
-                    bottom = Math.max(bottom, y);
+        // 使用 MediaPipe Pose 数据更新阴影
+        if (now - lastShadowUpdate >= SHADOW_UPDATE_INTERVAL && poseResults) {
+            // 计算人体轮廓边界
+            const landmarks = poseResults.poseLandmarks;
+            if (landmarks) {
+                // 清除画布
+                shadowCtx.clearRect(0, 0, shadowCanvas.width, shadowCanvas.height);
+                
+                // 保存当前上下文状态
+                shadowCtx.save();
+                
+                // 设置阴影样式
+                shadowCtx.filter = `blur(${SHADOW_BLUR}px)`;
+                
+                // 绘制头部阴影
+                if (landmarks[0]) { // 鼻子关键点
+                    const headX = landmarks[0].x * shadowCanvas.width;
+                    const headY = landmarks[0].y * shadowCanvas.height;
+                    const headRadius = shadowCanvas.width * 0.08; // 增大头部阴影大小
+                    
+                    const headGradient = shadowCtx.createRadialGradient(
+                        headX, headY, 0,
+                        headX, headY, headRadius
+                    );
+                    headGradient.addColorStop(0, `rgba(0, 0, 0, ${SHADOW_OPACITY * 1.2})`);
+                    headGradient.addColorStop(0.6, `rgba(0, 0, 0, ${SHADOW_OPACITY * 0.8})`);
+                    headGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    shadowCtx.fillStyle = headGradient;
+                    shadowCtx.beginPath();
+                    shadowCtx.arc(headX, headY, headRadius, 0, Math.PI * 2);
+                    shadowCtx.fill();
                 }
+                
+                // 绘制躯干阴影
+                if (landmarks[11] && landmarks[12] && landmarks[23] && landmarks[24]) {
+                    const torsoX = (landmarks[11].x + landmarks[12].x + landmarks[23].x + landmarks[24].x) / 4 * shadowCanvas.width;
+                    const torsoY = (landmarks[11].y + landmarks[12].y + landmarks[23].y + landmarks[24].y) / 4 * shadowCanvas.height;
+                    const torsoWidth = Math.abs(landmarks[11].x - landmarks[12].x) * shadowCanvas.width;
+                    const torsoHeight = Math.abs(landmarks[11].y - landmarks[24].y) * shadowCanvas.height;
+                    const torsoRadius = Math.max(torsoWidth, torsoHeight) / 1.5;
+                    
+                    const torsoGradient = shadowCtx.createRadialGradient(
+                        torsoX, torsoY, 0,
+                        torsoX, torsoY, torsoRadius
+                    );
+                    torsoGradient.addColorStop(0, `rgba(0, 0, 0, ${SHADOW_OPACITY * 0.8})`);
+                    torsoGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    shadowCtx.fillStyle = torsoGradient;
+                    shadowCtx.beginPath();
+                    shadowCtx.ellipse(torsoX, torsoY, torsoRadius, torsoRadius * 0.6, 0, 0, Math.PI * 2);
+                    shadowCtx.fill();
+                }
+                
+                // 绘制手臂阴影
+                const drawLimbShadow = (start, mid, end) => {
+                    if (!landmarks[start] || !landmarks[mid] || !landmarks[end]) return;
+                    
+                    const startX = landmarks[start].x * shadowCanvas.width;
+                    const startY = landmarks[start].y * shadowCanvas.height;
+                    const midX = landmarks[mid].x * shadowCanvas.width;
+                    const midY = landmarks[mid].y * shadowCanvas.height;
+                    const endX = landmarks[end].x * shadowCanvas.width;
+                    const endY = landmarks[end].y * shadowCanvas.height;
+                    
+                    // 绘制关节连接处的阴影
+                    const limbRadius = shadowCanvas.width * 0.02;
+                    shadowCtx.fillStyle = `rgba(0, 0, 0, ${SHADOW_OPACITY * 0.6})`;
+                    
+                    // 上臂
+                    shadowCtx.beginPath();
+                    shadowCtx.moveTo(startX, startY);
+                    shadowCtx.lineTo(midX, midY);
+                    shadowCtx.lineWidth = limbRadius * 2;
+                    shadowCtx.strokeStyle = `rgba(0, 0, 0, ${SHADOW_OPACITY * 0.6})`;
+                    shadowCtx.stroke();
+                    
+                    // 下臂
+                    shadowCtx.beginPath();
+                    shadowCtx.moveTo(midX, midY);
+                    shadowCtx.lineTo(endX, endY);
+                    shadowCtx.stroke();
+                };
+                
+                // 绘制左右手臂阴影
+                drawLimbShadow(11, 13, 15); // 左手臂
+                drawLimbShadow(12, 14, 16); // 右手臂
+                
+                // 绘制腿部阴影
+                drawLimbShadow(23, 25, 27); // 左腿
+                drawLimbShadow(24, 26, 28); // 右腿
+                
+                // 恢复上下文状态
+                shadowCtx.restore();
             }
-            
-            tempCtx.putImageData(imageData, 0, 0);
-
-            // 应用位置平滑
-            if (lastPositionsShadow.left !== null) {
-                left = lastPositionsShadow.left + (left - lastPositionsShadow.left) * smoothingFactor;
-                right = lastPositionsShadow.right + (right - lastPositionsShadow.right) * smoothingFactor;
-                top = lastPositionsShadow.top + (top - lastPositionsShadow.top) * smoothingFactor;
-                bottom = lastPositionsShadow.bottom + (bottom - lastPositionsShadow.bottom) * smoothingFactor;
-            }
-
-            lastPositionsShadow = { left, right, top, bottom };
-
-            // 计算缩放和位置
-            const personWidth = right - left;
-            const personHeight = bottom - top;
-            const scale = Math.min(
-                shadowCanvas.width / personWidth * 0.8,
-                shadowCanvas.height / personHeight * 0.8
-            );
-
-            // 在阴影画布上绘制
-            shadowCtx.save();
-            
-            // 优化的模糊效果
-            shadowCtx.filter = 'blur(3px)';
-            
-            // 水平翻转
-            shadowCtx.translate(shadowCanvas.width, 0);
-            shadowCtx.scale(-1, 1);
-
-            // 使用整数坐标避免子像素渲染
-            const destWidth = Math.round(personWidth * scale);
-            const destHeight = Math.round(personHeight * scale);
-            const destX = Math.round((shadowCanvas.width - destWidth) / 2);
-            const destY = Math.round((shadowCanvas.height - destHeight) / 2);
-
-            // 优化图像质量设置
-            shadowCtx.imageSmoothingEnabled = true;
-            shadowCtx.imageSmoothingQuality = 'high';
-
-            shadowCtx.drawImage(
-                tempCanvas,
-                Math.round(left), Math.round(top), 
-                Math.round(personWidth), Math.round(personHeight),
-                destX, destY, 
-                destWidth, destHeight
-            );
-
-            shadowCtx.restore();
+            lastShadowUpdate = now;
         }
     } catch (error) {
         console.error('Error updating shadow:', error);
@@ -561,8 +572,7 @@ function onPoseResults(results) {
 
     // 更新人物阴影
     const video = document.getElementById('webcamView');
-    updateShadow(video);
-
+    updateShadow(video, results);
     const now = Date.now();
     
     // 初始化历史记录

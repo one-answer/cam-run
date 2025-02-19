@@ -16,8 +16,12 @@
         }
         #webcamView {
             position: fixed;
-            opacity: 0;  
-            z-index: -1;
+            bottom: 10px;
+            right: 10px;
+            width: 320px;
+            height: 240px;
+            border: 2px solid white;
+            z-index: 100;
         }
         #gameCanvas {
             position: fixed;
@@ -56,22 +60,6 @@
         .status-error {
             color: #F44336;
         }
-        #shadowContainer {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 400px;
-            height: 160px;
-            background: rgba(200, 200, 200, 0.1);
-            border-radius: 15px;
-            overflow: hidden;
-            z-index: 100;
-        }
-        #shadowCanvas {
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-        }
     </style>
 </head>
 <body>
@@ -83,14 +71,13 @@
     </div>
     <div id="fps">FPS: <span id="fpsValue">0</span></div>
     <div id="gameState"></div>
-    <div id="shadowContainer"></div>
-    <video id="webcamView" autoplay></video>
+    <canvas id="skeletonCanvas" style="position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); width: 320px; height: 240px; border: 2px solid white; z-index: 99;"></canvas>
+    <video id="webcamView" style="display: none;"></video>
     <canvas id="gameCanvas"></canvas>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4.1633558788/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
