@@ -957,14 +957,27 @@ function onPoseResults(results) {
         
         if (consecutiveMovements >= 2) {
             isRunning = true;
-            // 改进加速度计算，使其更平滑且与运动强度更相关
-            const accelerationFactor = Math.min(1.5, (maxMovement - dynamicThreshold) / dynamicThreshold);
-            // 提高最大速度增量，同时保持平滑过渡
-            targetSpeed = Math.min(maxSpeed, targetSpeed + 0.5 * accelerationFactor);
             
-            if (now - lastStepTime > 200) {
+            // 计算步频（步数/秒）
+            const currentTime = now;
+            const stepInterval = currentTime - lastStepTime;
+            if (stepInterval > 200) { // 最小步频间隔200ms
                 stepCount++;
-                lastStepTime = now;
+                
+                // 计算实时步频
+                const stepsPerSecond = 1000 / stepInterval;
+                // 正常跑步步频范围约为2.3-3.5步/秒
+                const normalizedStepRate = Math.min(Math.max(stepsPerSecond, 1.5), 4.0);
+                
+                // 根据步频和动作强度计算目标速度
+                const stepRateFactor = (normalizedStepRate - 1.5) / 2.5; // 归一化到0-1范围
+                const intensityFactor = Math.min(1.5, (maxMovement - dynamicThreshold) / dynamicThreshold);
+                
+                // 综合考虑步频和动作强度
+                const speedFactor = (stepRateFactor * 0.7 + intensityFactor * 0.3);
+                targetSpeed = Math.min(maxSpeed, maxSpeed * speedFactor);
+                
+                lastStepTime = currentTime;
             }
         }
     } else if (maxMovement <= noiseThreshold) {
@@ -973,15 +986,16 @@ function onPoseResults(results) {
             isRunning = false;
         }
         targetSpeed = 0;
-        // 增加减速率，使停止更自然
-        speed = Math.max(0, speed - 2.0);
+        // 使用更平滑的减速曲线
+        const decelRate = speed * 0.15 + 0.5; // 速度越快，减速越快
+        speed = Math.max(0, speed - decelRate);
     } else {
         consecutiveMovements = Math.max(0, consecutiveMovements - 1);
         if (consecutiveMovements === 0 && isRunning) {
             isRunning = false;
         }
         // 更平滑的减速
-        targetSpeed = Math.max(0, targetSpeed - 0.3);
+        targetSpeed = Math.max(0, targetSpeed - 0.2);
     }
 
     // 更新游戏状态
