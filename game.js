@@ -161,16 +161,16 @@ async function init() {
         // 设置渲染器
         renderer = new THREE.WebGLRenderer({ 
             canvas: document.getElementById('gameCanvas'),
-            antialias: true,
+            antialias: false,
             powerPreference: 'high-performance',
-            precision: 'mediump'
+            precision: 'lowp'
         });
         renderer.setSize(window.innerWidth, window.innerHeight);
         // 限制设备像素比以降低GPU负载
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         // 启用渲染器的性能优化
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.type = THREE.BasicShadowMap;
         // 设置视锥体剔除
         const frustum = new THREE.Frustum();
         const projScreenMatrix = new THREE.Matrix4();
@@ -191,8 +191,8 @@ async function init() {
             segmentLength: 1000,
             segmentWidth: 100,
             activeSegments: 5,
-            decorationsPerSegment: 30,    // 减少每段的装饰物数量，但确保密度适中
-            maxDecorationsPool: 500,      // 保持合理的池大小
+            decorationsPerSegment: 15,    // 减少每段的装饰物数量，但确保密度适中
+            maxDecorationsPool: 300,      // 保持合理的池大小
             lastGeneratedZ: 0,
             decorationSpawnRange: {        // 添加装饰物生成范围控制
                 minX: -60,
@@ -254,9 +254,9 @@ async function init() {
                     
                     // 根据初始距离设置LOD
                     const distance = position.distanceTo(camera.position);
-                    if (distance > 1500) {
+                    if (distance > 1000) {
                         decoration.scale.set(0.3, 0.3, 0.3);
-                    } else if (distance > 800) {
+                    } else if (distance > 500) {
                         decoration.scale.set(0.6, 0.6, 0.6);
                     } else {
                         decoration.scale.set(1, 1, 1);
@@ -283,10 +283,10 @@ async function init() {
         });
 
         pose.setOptions({
-            modelComplexity: 1,
+            modelComplexity: 0,
             smoothLandmarks: true,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            minDetectionConfidence: 0.7,
+            minTrackingConfidence: 0.7
         });
 
         // 设置回调函数
@@ -326,21 +326,57 @@ async function detectPose() {
     requestAnimationFrame(detectPose);
 }
 
-// 添加FPS计数器
+// 添加增强型FPS计数器
 let frameCount = 0;
 let lastTime = performance.now();
+let fpsHistory = [];
+const FPS_HISTORY_SIZE = 60; // 保存1分钟的FPS历史
+let frameTimeHistory = [];
+const FRAME_TIME_HISTORY_SIZE = 100; // 保存最近100帧的帧时间
 
 function updateFPS() {
     const fpsElement = document.getElementById('fpsValue');
-    if (!fpsElement) return; // 如果元素不存在，直接返回
+    if (!fpsElement) return;
 
     frameCount++;
     const currentTime = performance.now();
+    const frameDuration = currentTime - lastTime;
+
+    // 记录帧时间
+    frameTimeHistory.push(frameDuration);
+    if (frameTimeHistory.length > FRAME_TIME_HISTORY_SIZE) {
+        frameTimeHistory.shift();
+    }
+
     if (currentTime - lastTime >= 1000) {
-        const fps = Math.round(frameCount * 1000 / (currentTime - lastTime));
-        fpsElement.textContent = fps;
+        // 计算当前FPS
+        const instantFps = Math.round(frameCount * 1000 / (currentTime - lastTime));
+        
+        // 更新FPS历史
+        fpsHistory.push(instantFps);
+        if (fpsHistory.length > FPS_HISTORY_SIZE) {
+            fpsHistory.shift();
+        }
+
+        // 计算平均FPS
+        const avgFps = Math.round(fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length);
+        
+        // 计算帧时间统计
+        const avgFrameTime = frameTimeHistory.reduce((a, b) => a + b, 0) / frameTimeHistory.length;
+        const maxFrameTime = Math.max(...frameTimeHistory);
+        const minFrameTime = Math.min(...frameTimeHistory);
+
+        // 更新显示
+        fpsElement.innerHTML = `${instantFps} (avg: ${avgFps})<br>帧时间: ${avgFrameTime.toFixed(1)}ms<br>范围: ${minFrameTime.toFixed(1)}-${maxFrameTime.toFixed(1)}ms`;
+
+        // 重置计数器
         frameCount = 0;
         lastTime = currentTime;
+
+        // 性能警告
+        if (avgFps < 30) {
+            console.warn('性能警告：帧率低于30FPS');
+        }
     }
 }
 
