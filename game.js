@@ -16,7 +16,7 @@ function updateGameState() {
     }
 
     // 计算动作质量评分
-    const qualityScore = Math.min(100, (gameState.movementQuality * 100));
+    const qualityScore = gameState.movementQuality;
     const qualityClass = qualityScore > 80 ? 'status-good' :
                         qualityScore > 50 ? 'status-warning' :
                         'status-error';
@@ -283,7 +283,7 @@ async function init() {
         });
 
         pose.setOptions({
-            modelComplexity: 0,
+            modelComplexity: 1,
             smoothLandmarks: true,
             minDetectionConfidence: 0.7,
             minTrackingConfidence: 0.7
@@ -352,31 +352,31 @@ function updateFPS() {
         // 计算当前FPS
         const instantFps = Math.round(frameCount * 1000 / (currentTime - lastTime));
         
-        // 更新FPS历史
-        fpsHistory.push(instantFps);
-        if (fpsHistory.length > FPS_HISTORY_SIZE) {
-            fpsHistory.shift();
-        }
+        // // 更新FPS历史
+        // fpsHistory.push(instantFps);
+        // if (fpsHistory.length > FPS_HISTORY_SIZE) {
+        //     fpsHistory.shift();
+        // }
 
-        // 计算平均FPS
-        const avgFps = Math.round(fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length);
+        // // 计算平均FPS
+        // const avgFps = Math.round(fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length);
         
-        // 计算帧时间统计
-        const avgFrameTime = frameTimeHistory.reduce((a, b) => a + b, 0) / frameTimeHistory.length;
-        const maxFrameTime = Math.max(...frameTimeHistory);
-        const minFrameTime = Math.min(...frameTimeHistory);
+        // // 计算帧时间统计
+        // const avgFrameTime = frameTimeHistory.reduce((a, b) => a + b, 0) / frameTimeHistory.length;
+        // const maxFrameTime = Math.max(...frameTimeHistory);
+        // const minFrameTime = Math.min(...frameTimeHistory);
 
         // 更新显示
-        fpsElement.innerHTML = `${instantFps} (avg: ${avgFps})<br>帧时间: ${avgFrameTime.toFixed(1)}ms<br>范围: ${minFrameTime.toFixed(1)}-${maxFrameTime.toFixed(1)}ms`;
+        fpsElement.innerHTML = `${instantFps} `;
 
         // 重置计数器
         frameCount = 0;
         lastTime = currentTime;
 
         // 性能警告
-        if (avgFps < 30) {
-            console.warn('性能警告：帧率低于30FPS');
-        }
+        // if (avgFps < 30) {
+        //     console.warn('性能警告：帧率低于30FPS');
+        // }
     }
 }
 
@@ -706,7 +706,21 @@ async function updateShadow(video, poseResults) {
 }
 
 function onPoseResults(results) {
+    // 如果没有检测到姿势，立即停止
     if (!results.poseLandmarks) {
+        consecutiveMovements = 0;
+        if (isRunning) {
+            isRunning = false;
+        }
+        targetSpeed = 0;
+        speed = 0;  // 直接设置速度为0，而不是缓慢减速
+        
+        // 更新状态
+        gameState.movementQuality = 0;
+        gameState.currentSpeed = speed;
+        gameState.stepCount = stepCount;
+        gameState.debugInfo = '未检测到人物';
+        updateGameState();
         return;
     }
 
@@ -982,10 +996,10 @@ function onPoseResults(results) {
     // 使用最大值作为当前运动强度
     const maxMovement = Math.max(...movementBuffer);
 
-    // 设置阈值
-    const baselineThreshold = 0.15;
-    const noiseThreshold = 0.05;
-    const dynamicThreshold = baselineThreshold * (1 + speed/maxSpeed * 0.5);
+    // 设置阈值和参数
+    const baselineThreshold = 0.12; // 降低基准阈值，提高灵敏度
+    const noiseThreshold = 0.04; // 降低噪声阈值
+    const dynamicThreshold = baselineThreshold * (1 + speed/maxSpeed * 0.3); // 减小动态阈值的影响
     
     // 步态检测逻辑
     if (maxMovement > dynamicThreshold && maxMovement > noiseThreshold) {
@@ -997,21 +1011,23 @@ function onPoseResults(results) {
             // 计算步频（步数/秒）
             const currentTime = now;
             const stepInterval = currentTime - lastStepTime;
-            if (stepInterval > 200) { // 最小步频间隔200ms
+            if (stepInterval > 150) { // 降低最小步频间隔到150ms，提高响应性
                 stepCount++;
                 
-                // 计算实时步频
+                // 计算实时步频，调整范围到1.8-4.2步/秒
                 const stepsPerSecond = 1000 / stepInterval;
-                // 正常跑步步频范围约为2.3-3.5步/秒
-                const normalizedStepRate = Math.min(Math.max(stepsPerSecond, 1.5), 4.0);
+                const normalizedStepRate = Math.min(Math.max(stepsPerSecond, 1.8), 4.2);
                 
                 // 根据步频和动作强度计算目标速度
-                const stepRateFactor = (normalizedStepRate - 1.5) / 2.5; // 归一化到0-1范围
-                const intensityFactor = Math.min(1.5, (maxMovement - dynamicThreshold) / dynamicThreshold);
+                const stepRateFactor = (normalizedStepRate - 1.8) / 2.4; // 归一化到0-1范围
+                const intensityFactor = Math.min(1.8, (maxMovement - dynamicThreshold) / dynamicThreshold);
                 
-                // 综合考虑步频和动作强度
-                const speedFactor = (stepRateFactor * 0.7 + intensityFactor * 0.3);
-                targetSpeed = Math.min(maxSpeed, maxSpeed * speedFactor);
+                // 调整步频和动作强度的权重
+                const speedFactor = (stepRateFactor * 0.6 + intensityFactor * 0.4);
+                const newTargetSpeed = Math.min(maxSpeed, maxSpeed * speedFactor);
+                
+                // 使用LERP进行平滑插值
+                targetSpeed = targetSpeed + (newTargetSpeed - targetSpeed) * 0.3;
                 
                 lastStepTime = currentTime;
             }
@@ -1023,7 +1039,7 @@ function onPoseResults(results) {
         }
         targetSpeed = 0;
         // 使用更平滑的减速曲线
-        const decelRate = speed * 0.15 + 0.5; // 速度越快，减速越快
+        const decelRate = speed * 0.12 + 0.3; // 降低减速率
         speed = Math.max(0, speed - decelRate);
     } else {
         consecutiveMovements = Math.max(0, consecutiveMovements - 1);
@@ -1031,13 +1047,69 @@ function onPoseResults(results) {
             isRunning = false;
         }
         // 更平滑的减速
-        targetSpeed = Math.max(0, targetSpeed - 0.2);
+        targetSpeed = Math.max(0, targetSpeed - 0.15); // 降低减速率
     }
+    
+    // 使用LERP进行速度平滑插值
+    speed = speed + (targetSpeed - speed) * 0.1;
 
+    // 计算动作质量评分
+    const calculateMovementQuality = (maxMovement, armSwingCoordination, poseStatus, results) => {
+        let qualityScore = 0;
+        let factors = 0;
+        
+        // 1. 运动强度评分 (30%)
+        const intensityScore = Math.min(100, (maxMovement / baselineThreshold) * 100);
+        qualityScore += intensityScore * 0.3;
+        factors++;
+        
+        // 2. 手臂协调性评分 (30%)
+        const armScore = armSwingCoordination * 100;
+        qualityScore += armScore * 0.3;
+        factors++;
+        
+        // 3. 躯干姿态评分 (20%)
+        let postureScore = 0;
+        if (poseStatus.hasShoulders && poseStatus.hasHips) {
+            const landmarks = results.poseLandmarks;
+            // 计算躯干垂直度
+            const leftShoulderY = landmarks[11].y;
+            const leftHipY = landmarks[23].y;
+            const rightShoulderY = landmarks[12].y;
+            const rightHipY = landmarks[24].y;
+            
+            const torsoAngleLeft = Math.abs(Math.atan2(leftHipY - leftShoulderY, 0.001));
+            const torsoAngleRight = Math.abs(Math.atan2(rightHipY - rightShoulderY, 0.001));
+            const averageTorsoAngle = (torsoAngleLeft + torsoAngleRight) / 2;
+            
+            // 理想角度是90度（π/2）
+            const angleDiff = Math.abs(averageTorsoAngle - Math.PI/2);
+            postureScore = Math.max(0, 100 * (1 - angleDiff / (Math.PI/4)));
+            qualityScore += postureScore * 0.2;
+            factors++;
+        }
+        
+        // 4. 步频稳定性评分 (20%)
+        let cadenceScore = 0;
+        if (isRunning && lastStepTime) {
+            const currentTime = Date.now();
+            const stepInterval = currentTime - lastStepTime;
+            // 理想步频范围：1.8-4.2步/秒
+            const stepsPerSecond = 1000 / stepInterval;
+            const normalizedStepRate = Math.min(Math.max(stepsPerSecond, 1.8), 4.2);
+            cadenceScore = 100 * (1 - Math.abs(normalizedStepRate - 3) / 1.2);
+            qualityScore += cadenceScore * 0.2;
+            factors++;
+        }
+        
+        // 计算最终得分
+        return factors > 0 ? qualityScore / factors : 0;
+    };
+    
     // 更新游戏状态
-    gameState.movementQuality = Math.min(100, maxMovement / baselineThreshold * 100);
+    gameState.movementQuality = calculateMovementQuality(maxMovement, armSwingCoordination, poseStatus, results);
     gameState.currentSpeed = speed;
     gameState.stepCount = stepCount;
-    gameState.debugInfo = `运动强度: ${maxMovement.toFixed(3)}, 阈值: ${dynamicThreshold.toFixed(3)}`;
+    gameState.debugInfo = `运动强度: ${(maxMovement/baselineThreshold*100).toFixed(1)}%, 手臂协调: ${(armSwingCoordination*100).toFixed(1)}%`;
     updateGameState();
 }
