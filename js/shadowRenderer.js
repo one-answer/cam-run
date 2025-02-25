@@ -312,183 +312,313 @@ function onPoseResults(results) {
         };
     };
 
+    // 计算关键点的速度和加速度
+    const calculatePointVelocity = (point, prevPoint, timeDelta) => {
+        if (!point || !prevPoint || timeDelta === 0) return { x: 0, y: 0 };
+        return {
+            x: (point.x - prevPoint.x) / timeDelta,
+            y: (point.y - prevPoint.y) / timeDelta
+        };
+    };
+
+    const calculateVelocityMagnitude = (velocity) => {
+        return Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    };
+
+    // 分析关键点的运动
+    let velocities = {
+        leftAnkle: { x: 0, y: 0 },
+        rightAnkle: { x: 0, y: 0 },
+        leftKnee: { x: 0, y: 0 },
+        rightKnee: { x: 0, y: 0 },
+        leftHip: { x: 0, y: 0 },
+        rightHip: { x: 0, y: 0 },
+        leftElbow: { x: 0, y: 0 },
+        rightElbow: { x: 0, y: 0 }
+    };
+
+    // 计算各个关键点的速度
+    if (window.poseHistory.timestamps.length >= 2) {
+        const currentIdx = window.poseHistory.timestamps.length - 1;
+        const prevIdx = currentIdx - 1;
+        const timeDelta = (window.poseHistory.timestamps[currentIdx] - window.poseHistory.timestamps[prevIdx]) / 1000;
+
+        if (checkRunningPose(results.poseLandmarks).hasArms) {
+            velocities.leftElbow = calculatePointVelocity(
+                window.poseHistory.leftElbow[currentIdx],
+                window.poseHistory.leftElbow[prevIdx],
+                timeDelta
+            );
+            velocities.rightElbow = calculatePointVelocity(
+                window.poseHistory.rightElbow[currentIdx],
+                window.poseHistory.rightElbow[prevIdx],
+                timeDelta
+            );
+        }
+
+        if (checkRunningPose(results.poseLandmarks).hasLowerBody) {
+            velocities.leftAnkle = calculatePointVelocity(
+                window.poseHistory.leftAnkle[currentIdx],
+                window.poseHistory.leftAnkle[prevIdx],
+                timeDelta
+            );
+            velocities.rightAnkle = calculatePointVelocity(
+                window.poseHistory.rightAnkle[currentIdx],
+                window.poseHistory.rightAnkle[prevIdx],
+                timeDelta
+            );
+            velocities.leftKnee = calculatePointVelocity(
+                window.poseHistory.leftKnee[currentIdx],
+                window.poseHistory.leftKnee[prevIdx],
+                timeDelta
+            );
+            velocities.rightKnee = calculatePointVelocity(
+                window.poseHistory.rightKnee[currentIdx],
+                window.poseHistory.rightKnee[prevIdx],
+                timeDelta
+            );
+        }
+    }
+
     // 计算运动强度
-    let totalIntensity = 0;
-    let validMeasurements = 0;
-    let movementQuality = 0;
+    let movementIntensities = {
+        arms: 0,
+        legs: 0
+    };
 
-    // 检查姿势是否有效
-    const poseStatus = checkRunningPose(results.poseLandmarks);
-    
-    if (!poseStatus.isValid) {
-        // 如果姿势无效，直接停止
-        consecutiveMovements = 0;
-        if (isRunning) {
-            isRunning = false;
-        }
-        targetSpeed = 0;
-        speed = Math.max(0, speed - 1.5);
-        
-        // 更新状态
-        gameState.movementQuality = 0;
-        gameState.currentSpeed = speed;
-        gameState.stepCount = stepCount;
-        
-        // 设置具体的失败原因
-        let invalidReason = '';
-        if (!poseStatus.hasUpperBody) {
-            invalidReason = '需要看到肩部';
-        } else if (!poseStatus.hasArms && !poseStatus.hasLowerBody) {
-            invalidReason = '需要看到手臂或下半身';
-        } else {
-            invalidReason = '请保持正确的姿势';
-        }
-        gameState.debugInfo = `无效的运动姿势 (${invalidReason})`;
-        updateGameState();
-        return;
+    // 计算手臂运动强度
+    if (checkRunningPose(results.poseLandmarks).hasArms) {
+        const leftElbowSpeed = calculateVelocityMagnitude(velocities.leftElbow);
+        const rightElbowSpeed = calculateVelocityMagnitude(velocities.rightElbow);
+        movementIntensities.arms = (leftElbowSpeed + rightElbowSpeed) / 2;
     }
 
-    // 计算手臂运动
-    let leftArmIntensity = 0;
-    let rightArmIntensity = 0;
+    // 计算腿部运动强度
+    if (checkRunningPose(results.poseLandmarks).hasLowerBody) {
+        const leftLegSpeed = (
+            calculateVelocityMagnitude(velocities.leftAnkle) +
+            calculateVelocityMagnitude(velocities.leftKnee)
+        ) / 2;
+        const rightLegSpeed = (
+            calculateVelocityMagnitude(velocities.rightAnkle) +
+            calculateVelocityMagnitude(velocities.rightKnee)
+        ) / 2;
+        movementIntensities.legs = (leftLegSpeed + rightLegSpeed) / 2;
+    }
 
-    // 计算左臂运动（如果可见）
-    if (poseStatus.hasLeftArm && window.poseHistory.leftElbow.length >= 2) {
+    // 分析步态和协调性
+    let gaitQuality = 0;
+    let coordinationQuality = 0;
+
+    if (checkRunningPose(results.poseLandmarks).hasArms) {
+        // 检查手臂交替
         const currentIdx = window.poseHistory.leftElbow.length - 1;
-        const prevIdx = currentIdx - 1;
-        const timeDelta = (window.poseHistory.timestamps[currentIdx] - window.poseHistory.timestamps[prevIdx]) / 1000;
-
-        const currentRelative = {
-            x: window.poseHistory.leftElbow[currentIdx].x - window.poseHistory.leftShoulder[currentIdx].x,
-            y: window.poseHistory.leftElbow[currentIdx].y - window.poseHistory.leftShoulder[currentIdx].y
-        };
-
-        const previousRelative = {
-            x: window.poseHistory.leftElbow[prevIdx].x - window.poseHistory.leftShoulder[prevIdx].x,
-            y: window.poseHistory.leftElbow[prevIdx].y - window.poseHistory.leftShoulder[prevIdx].y
-        };
-
-        const velocity = calculateVelocity(currentRelative, previousRelative, timeDelta);
-        leftArmIntensity = calculateIntensity(velocity);
-        totalIntensity += leftArmIntensity;
-        validMeasurements++;
-    }
-
-    // 计算右臂运动（如果可见）
-    if (poseStatus.hasRightArm && window.poseHistory.rightElbow.length >= 2) {
-        const currentIdx = window.poseHistory.rightElbow.length - 1;
-        const prevIdx = currentIdx - 1;
-        const timeDelta = (window.poseHistory.timestamps[currentIdx] - window.poseHistory.timestamps[prevIdx]) / 1000;
-
-        const currentRelative = {
-            x: window.poseHistory.rightElbow[currentIdx].x - window.poseHistory.rightShoulder[currentIdx].x,
-            y: window.poseHistory.rightElbow[currentIdx].y - window.poseHistory.rightShoulder[currentIdx].y
-        };
-
-        const previousRelative = {
-            x: window.poseHistory.rightElbow[prevIdx].x - window.poseHistory.rightShoulder[prevIdx].x,
-            y: window.poseHistory.rightElbow[prevIdx].y - window.poseHistory.rightShoulder[prevIdx].y
-        };
-
-        const velocity = calculateVelocity(currentRelative, previousRelative, timeDelta);
-        rightArmIntensity = calculateIntensity(velocity);
-        totalIntensity += rightArmIntensity;
-        validMeasurements++;
-    }
-
-    // 检测手臂摆动模式
-    let armSwingCoordination = 0;
-    if (poseStatus.hasLeftArm && poseStatus.hasRightArm) {
-        const currentIdx = window.poseHistory.leftElbow.length - 1;
-        const leftArmY = window.poseHistory.leftElbow[currentIdx].y;
-        const rightArmY = window.poseHistory.rightElbow[currentIdx].y;
-        
-        // 检查手臂交替摆动
-        if (Math.abs(leftArmY - rightArmY) > 0.1) {
-            const newPhase = leftArmY > rightArmY ? 'left_up' : 'right_up';
-            if (window.poseHistory.lastArmSwingPhase !== newPhase) {
-                armSwingCoordination = 1.0;
-                window.poseHistory.lastArmSwingPhase = newPhase;
-            }
-        }
-    } else if ((poseStatus.hasLeftArm && leftArmIntensity > 0.2) || 
-               (poseStatus.hasRightArm && rightArmIntensity > 0.2)) {
-        // 单手摆动
-        armSwingCoordination = 0.7;
-    }
-
-    // 计算平均运动强度
-    const currentMovement = validMeasurements > 0 
-        ? (totalIntensity / validMeasurements) * (0.5 + 0.5 * armSwingCoordination)
-        : 0;
-    
-    // 更新运动缓冲区
-    movementBuffer.push(currentMovement);
-    if (movementBuffer.length > 3) {
-        movementBuffer.shift();
-    }
-
-    // 使用最大值作为当前运动强度
-    const maxMovement = Math.max(...movementBuffer);
-
-    // 设置阈值（根据检测模式调整）
-    const baselineThreshold = poseStatus.isFullBodyMode ? 0.15 : 0.12;
-    const noiseThreshold = 0.05;
-    const dynamicThreshold = baselineThreshold * (1 + speed/maxSpeed * 0.5);
-    
-    // 步态检测逻辑
-    if (maxMovement > dynamicThreshold && maxMovement > noiseThreshold) {
-        if (!isRunning) consecutiveMovements++;
-        
-        if (consecutiveMovements >= 2) {
-            isRunning = true;
+        if (window.poseHistory.leftElbow[currentIdx] && window.poseHistory.rightElbow[currentIdx]) {
+            const leftArmY = window.poseHistory.leftElbow[currentIdx].y;
+            const rightArmY = window.poseHistory.rightElbow[currentIdx].y;
             
-            // 计算步频（步数/秒）
-            const currentTime = now;
-            const stepInterval = currentTime - lastStepTime;
-            if (stepInterval > 200) { // 最小步频间隔200ms
-                stepCount++;
-                
-                // 计算实时步频
-                const stepsPerSecond = 1000 / stepInterval;
-                // 正常跑步步频范围约为2.3-3.5步/秒
-                const normalizedStepRate = Math.min(Math.max(stepsPerSecond, 1.5), 4.0);
-                
-                // 根据步频和动作强度计算目标速度
-                const stepRateFactor = (normalizedStepRate - 1.5) / 2.5; // 归一化到0-1范围
-                const intensityFactor = Math.min(1.5, (maxMovement - dynamicThreshold) / dynamicThreshold);
-                
-                // 综合考虑步频和动作强度
-                const speedFactor = (stepRateFactor * 0.7 + intensityFactor * 0.3);
-                // 上半身模式时给予更高的速度系数
-                const modeSpeedFactor = poseStatus.isFullBodyMode ? 1.0 : 1.3;
-                targetSpeed = Math.min(maxSpeed, maxSpeed * speedFactor * modeSpeedFactor);
-                
-                lastStepTime = currentTime;
+            // 检查手臂交替摆动
+            if (Math.abs(leftArmY - rightArmY) > 0.2) { // 提高差异要求
+                const newPhase = leftArmY > rightArmY ? 'left_up' : 'right_up';
+                if (window.poseHistory.lastArmSwingPhase !== newPhase) {
+                    coordinationQuality = 1.0;
+                    window.poseHistory.lastArmSwingPhase = newPhase;
+                }
             }
         }
-    } else if (maxMovement <= noiseThreshold) {
-        consecutiveMovements = 0;
-        if (isRunning) {
-            isRunning = false;
+    }
+
+    if (checkRunningPose(results.poseLandmarks).hasLowerBody) {
+        // 分析腿部运动模式
+        const leftAnkleSpeed = calculateVelocityMagnitude(velocities.leftAnkle);
+        const rightAnkleSpeed = calculateVelocityMagnitude(velocities.rightAnkle);
+        const speedDiff = Math.abs(leftAnkleSpeed - rightAnkleSpeed);
+        
+        // 检查腿部交替
+        if (speedDiff > 0.1) {
+            gaitQuality = Math.min(1.0, speedDiff / 0.3);
         }
-        targetSpeed = 0;
-        // 使用更平滑的减速曲线
-        const decelRate = speed * 0.15 + 0.5; // 速度越快，减速越快
-        speed = Math.max(0, speed - decelRate);
+    }
+
+    // 计算综合运动得分
+    const calculateMovementScore = () => {
+        // 手臂运动得分
+        const armScore = Math.min(1.0, movementIntensities.arms / 0.8); // 提高运动强度要求
+        const legScore = Math.min(1.0, movementIntensities.legs / 0.8);
+        
+        // 根据可见的部位调整权重
+        let weights = { arms: 0, legs: 0, coordination: 0 };
+        
+        if (checkRunningPose(results.poseLandmarks).isFullBodyMode) {
+            weights = { arms: 0.3, legs: 0.5, coordination: 0.2 }; // 增加腿部权重
+        } else if (checkRunningPose(results.poseLandmarks).hasArms) {
+            weights = { arms: 0.7, legs: 0, coordination: 0.3 }; // 提高上半身要求
+        } else if (checkRunningPose(results.poseLandmarks).hasLowerBody) {
+            weights = { arms: 0, legs: 0.8, coordination: 0.2 };
+        }
+
+        // 计算基础得分
+        const baseScore = (
+            armScore * weights.arms +
+            legScore * weights.legs +
+            Math.max(coordinationQuality, gaitQuality) * weights.coordination
+        );
+
+        // 应用非线性映射，使得高分更难达到
+        return Math.pow(baseScore, 1.5) * 0.7; // 使用指数映射并降低整体强度
+    };
+
+    const movementScore = calculateMovementScore();
+
+    // 时间和速度相关的全局变量（确保在函数外部定义）
+    let lastTimeStamp = 0;
+    let lastSpeed = 0;
+    let currentSpeed = 0;
+    let speedBuffer = [];
+    const maxSpeedBufferSize = 15; // 增加缓冲区大小
+    const maxTimeStep = 0.1; // 最大时间步长
+    const baseAcceleration = 2.0; // 基础加速度 (m/s²)
+    const baseDeceleration = 3.0; // 基础减速度 (m/s²)
+    const maxSpeedChangePerSecond = 3.0; // 每秒最大速度变化
+
+    // 获取当前时间差
+    const currentTime = performance.now();
+    const secondsPassed = Math.min((currentTime - lastTimeStamp) / 1000, maxTimeStep);
+    lastTimeStamp = currentTime;
+
+    // 计算运动强度（考虑频率和幅度）
+    const calculateMovementIntensity = () => {
+        // 计算运动频率得分 (理想频率范围：1.5-3Hz)
+        const frequency = calculateMovementFrequency();
+        const frequencyScore = Math.min(1.0, Math.max(0, 
+            frequency < 1.2 ? 0 : // 低于1.2Hz不计分
+            frequency > 3 ? 1 - (frequency - 3) / 1.5 : 
+            (frequency - 1.2) / 1.8
+        ));
+
+        // 计算运动幅度得分
+        const armAmplitude = Math.min(1.0, movementIntensities.arms / 2.5);
+        const legAmplitude = Math.min(1.0, movementIntensities.legs / 2.5);
+        const amplitudeScore = Math.pow((armAmplitude + legAmplitude) / 2, 1.2);
+        
+        // 综合得分，频率和幅度缺一不可
+        return Math.pow(frequencyScore * amplitudeScore, 1.1); // 使用更温和的非线性映射
+    };
+
+    const calculateMovementFrequency = () => {
+        if (window.poseHistory.timestamps.length < 2) return 0;
+        
+        // 计算平均运动周期
+        let totalDuration = 0;
+        for (let i = 1; i < window.poseHistory.timestamps.length; i++) {
+            totalDuration += window.poseHistory.timestamps[i] - window.poseHistory.timestamps[i - 1];
+        }
+        const averageCycleTime = totalDuration / (window.poseHistory.timestamps.length - 1);
+        
+        // 计算频率（Hz）
+        return 1000 / averageCycleTime;
+    };
+
+    // 更平滑的速度映射
+    const mapToRunningSpeed = (intensity) => {
+        // 使用更陡峭的曲线映射运动强度到目标速度
+        const minSpeed = 0.5; // 降低最小速度
+        const maxSpeed = 8.0;
+        const speedRange = maxSpeed - minSpeed;
+        
+        // 使用更陡峭的曲线，让低强度运动更难达到高速
+        const mappedIntensity = Math.pow(intensity, 2.5);
+        
+        // 分段映射，让速度增长更加合理
+        if (mappedIntensity < 0.3) {
+            return minSpeed + speedRange * 0.2 * (mappedIntensity / 0.3);
+        } else if (mappedIntensity < 0.6) {
+            return minSpeed + speedRange * (0.2 + 0.3 * ((mappedIntensity - 0.3) / 0.3));
+        } else if (mappedIntensity < 0.8) {
+            return minSpeed + speedRange * (0.5 + 0.3 * ((mappedIntensity - 0.6) / 0.2));
+        } else {
+            return minSpeed + speedRange * (0.8 + 0.2 * ((mappedIntensity - 0.8) / 0.2));
+        }
+    };
+
+    // 更新速度时增加变化限制
+    const updateSpeed = () => {
+        const movementIntensity = calculateMovementIntensity();
+        let targetSpeed = 0;
+
+        // 提高运动检测的门槛
+        if (movementIntensity > 0.25 && consecutiveMovements >= 15) {
+            targetSpeed = mapToRunningSpeed(movementIntensity);
+            
+            // 应用模式系数，降低上半身模式的速度系数
+            const modeSpeedFactor = poseStatus.isFullBodyMode ? 1.0 : 0.6;
+            targetSpeed *= modeSpeedFactor;
+
+            // 限制最大速度
+            targetSpeed = Math.min(maxSpeed, targetSpeed);
+        }
+
+        // 计算实际速度变化
+        const speedChangeLimit = 0.3; // 降低每秒最大速度变化
+        const currentIntensity = Math.max(0.1, movementIntensity); // 确保有最小强度值
+
+        if (targetSpeed > currentSpeed) {
+            // 基于当前运动强度调整加速度，使用更平缓的加速曲线
+            const actualAcceleration = baseAcceleration * Math.pow(currentIntensity, 1.8);
+            const speedIncrease = Math.min(
+                targetSpeed - currentSpeed,
+                actualAcceleration * secondsPassed,
+                speedChangeLimit * secondsPassed
+            );
+            currentSpeed += speedIncrease;
+        } else {
+            // 更平缓的减速
+            const speedDecrease = Math.min(
+                currentSpeed - targetSpeed,
+                baseDeceleration * secondsPassed,
+                speedChangeLimit * secondsPassed
+            );
+            currentSpeed = Math.max(targetSpeed, currentSpeed - speedDecrease);
+        }
+
+        // 更新速度缓冲区
+        speedBuffer.push(currentSpeed);
+        if (speedBuffer.length > maxSpeedBufferSize) {
+            speedBuffer.shift();
+        }
+
+        // 使用加权移动平均来平滑速度
+        let totalWeight = 0;
+        let smoothedSpeed = 0;
+        for (let i = 0; i < speedBuffer.length; i++) {
+            const weight = (i + 1) / speedBuffer.length; // 更新的速度有更高的权重
+            smoothedSpeed += speedBuffer[i] * weight;
+            totalWeight += weight;
+        }
+        smoothedSpeed /= totalWeight;
+        
+        // 确保速度在有效范围内
+        return Math.max(0, Math.min(maxSpeed, smoothedSpeed));
+    };
+
+    // 更新当前速度
+    speed = updateSpeed();
+
+    // 更新游戏状态
+    if (speed > 0.1) {
+        isRunning = true;
     } else {
         consecutiveMovements = Math.max(0, consecutiveMovements - 1);
-        if (consecutiveMovements === 0 && isRunning) {
+        if (consecutiveMovements === 0) {
             isRunning = false;
+            speedBuffer = []; // 清空速度缓冲区
         }
-        // 更平滑的减速
-        targetSpeed = Math.max(0, targetSpeed - 0.2);
     }
 
     // 更新游戏状态
-    gameState.movementQuality = Math.min(100, maxMovement / baselineThreshold * 100);
+    gameState.movementQuality = Math.min(100, weightedScore * 100);
     gameState.currentSpeed = speed;
     gameState.stepCount = stepCount;
-    gameState.debugInfo = `${poseStatus.isFullBodyMode ? '全身模式' : '上半身模式'} - 运动强度: ${maxMovement.toFixed(3)}, 阈值: ${dynamicThreshold.toFixed(3)}, 协调性: ${armSwingCoordination.toFixed(2)}`;
+    gameState.debugInfo = `${checkRunningPose(results.poseLandmarks).isFullBodyMode ? '全身模式' : '上半身模式'} - 运动强度: ${weightedScore.toFixed(3)}, 阈值: ${baselineThreshold.toFixed(3)}, 协调性: ${coordinationQuality.toFixed(2)}`;
     updateGameState();
 }
