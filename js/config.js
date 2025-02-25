@@ -1,12 +1,12 @@
 // 游戏配置
 export const GAME_CONFIG = {
     // 速度相关
-    maxSpeed: 5,
-    acceleration: 0.1,
-    deceleration: 0.05,
-    runningThreshold: 0.2,
-    bufferSize: 5,
-    requiredConsecutiveMovements: 3,
+    maxSpeed: 8,
+    acceleration: 0.2,
+    deceleration: 0.15,
+    runningThreshold: 0.2,     // 调整运动阈值
+    bufferSize: 3,
+    requiredConsecutiveMovements: 2,
 
     // 地形系统
     terrainSegmentLength: 1000,
@@ -16,9 +16,9 @@ export const GAME_CONFIG = {
     maxDecorationsPool: 300,
 
     // 姿势检测
-    poseConfidenceThreshold: 0.3,
-    calibrationFrames: 30,
-    movementThreshold: 0.1,
+    poseConfidenceThreshold: 0.25,
+    calibrationFrames: 15,
+    movementThreshold: 1.5,    // 降低速度阈值以适应新的检测逻辑
     stepDetectionThreshold: 0.15,
 
     // 渲染设置
