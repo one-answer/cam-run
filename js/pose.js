@@ -11,6 +11,11 @@ class PoseDetector {
         this.positionHistory = null;
         this.lastScore = null;
         this.currentArmPhase = 'neutral'; // 新增：当前手臂相位
+        this.lastProcessTime = 0;
+        this.processingInterval = 50;     // 每50ms处理一次姿势，降低到约20fps
+        this.isProcessing = false;        // 防止并行处理
+        this.isCloseUpMode = false;       // 新增：是否处于近距离模式
+        this.shoulderDistance = 0;        // 新增：肩膀之间的距离，用于判断用户与摄像头的距离
     }
 
     async init() {
@@ -36,11 +41,13 @@ class PoseDetector {
             }
         });
 
+        // 使用更低的模型复杂度和更低的检测频率以减少CPU使用
         this.detector.setOptions({
-            modelComplexity: 0,
+            modelComplexity: 0,           // 使用最低复杂度模型
             smoothLandmarks: true,
-            minDetectionConfidence: 0.5,  // 降低检测置信度要求
-            minTrackingConfidence: 0.5    // 降低跟踪置信度要求
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+            selfieMode: true              // 启用自拍模式可能会提高性能
         });
 
         // 设置结果回调
@@ -56,13 +63,21 @@ class PoseDetector {
         this.isRunning = true;
         while (this.isRunning) {
             try {
-                await this.detector.send({image: this.video});
+                const now = performance.now();
+                // 只有当距离上次处理超过指定间隔，且当前没有正在处理时，才发送新的图像
+                if (now - this.lastProcessTime >= this.processingInterval && !this.isProcessing) {
+                    this.isProcessing = true;
+                    this.lastProcessTime = now;
+                    await this.detector.send({image: this.video});
+                    this.isProcessing = false;
+                }
             } catch (error) {
                 console.error('姿势检测错误:', error);
                 gameState.setState({ debugInfo: '姿势检测错误' });
+                this.isProcessing = false;
             }
-            // 降低检测间隔到16ms (约60fps)
-            await new Promise(resolve => setTimeout(resolve, 16));
+            // 使用更长的等待时间
+            await new Promise(resolve => setTimeout(resolve, 20));
         }
     }
 
@@ -106,11 +121,22 @@ class PoseDetector {
             );
         };
 
+        // 计算关键点的平均可见性
+        const calculateAverageVisibility = (points) => {
+            if (points.length === 0) return 0;
+            return points.reduce((sum, point) => 
+                sum + (landmarks[point] ? landmarks[point].visibility : 0), 0) / points.length;
+        };
+
         // 分别检查上半身和下半身的关键点
         const upperBodyPoints = [11, 12, 13, 14]; // 肩膀和手肘
         const lowerBodyPoints = [23, 24, 25, 26]; // 髋部和膝盖
         const upperBodyVisible = checkVisibility(upperBodyPoints);
         const lowerBodyVisible = checkVisibility(lowerBodyPoints);
+        
+        // 计算上半身和下半身的平均可见性
+        const upperBodyVisibility = calculateAverageVisibility(upperBodyPoints);
+        const lowerBodyVisibility = calculateAverageVisibility(lowerBodyPoints);
 
         // 检查手臂和腿部的完整性
         const leftArmComplete = checkVisibility([11, 13, 15]); // 左肩到左手
@@ -124,6 +150,23 @@ class PoseDetector {
             isLowerBody: lowerBodyVisible && (leftLegComplete || rightLegComplete),
             isFullBody: upperBodyVisible && lowerBodyVisible
         };
+
+        // 新增：检测是否处于近距离模式
+        // 计算肩膀之间的距离，用于判断用户与摄像头的距离
+        if (landmarks[11] && landmarks[12]) {
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            this.shoulderDistance = Math.sqrt(
+                Math.pow(leftShoulder.x - rightShoulder.x, 2) + 
+                Math.pow(leftShoulder.y - rightShoulder.y, 2)
+            );
+            
+            // 当肩膀距离大于阈值，且上半身可见性好但下半身可见性差时，判定为近距离模式
+            this.isCloseUpMode = GAME_CONFIG.closeUpDetection.enabled && 
+                                 this.shoulderDistance > GAME_CONFIG.closeUpDetection.shoulderDistanceThreshold &&
+                                 upperBodyVisibility > GAME_CONFIG.closeUpDetection.upperBodyFocusThreshold &&
+                                 lowerBodyVisibility < GAME_CONFIG.closeUpDetection.upperBodyFocusThreshold;
+        }
 
         // 如果没有足够的关键点可见，则停止检测
         if (!detectionMode.isUpperBody && !detectionMode.isLowerBody) {
@@ -176,12 +219,17 @@ class PoseDetector {
             }
 
             // 计算手臂摆动的速度分数
-            const armVelocityScore = (
+            let armVelocityScore = (
                 Math.abs(leftArmVelocity.y) + 
                 Math.abs(rightArmVelocity.y) + 
                 Math.abs(leftArmVelocity.x) * 0.5 + 
                 Math.abs(rightArmVelocity.x) * 0.5
             ) / 2;
+            
+            // 近距离模式下增加手臂运动的权重
+            if (this.isCloseUpMode) {
+                armVelocityScore *= GAME_CONFIG.closeUpDetection.armMovementWeight;
+            }
             
             // 检查手臂协调性
             if (leftArmComplete && rightArmComplete) {
@@ -239,10 +287,17 @@ class PoseDetector {
 
         // 根据可见部位调整分数
         if (totalDetectedParts > 0) {
+            // 确定运动阈值
+            let threshold = GAME_CONFIG.movementThreshold;
+            
+            // 近距离模式下调整阈值
+            if (this.isCloseUpMode) {
+                threshold *= GAME_CONFIG.closeUpDetection.movementThresholdMultiplier;
+            }
             // 如果只有上半身可见，稍微降低运动阈值
-            const threshold = detectionMode.isUpperBody && !detectionMode.isLowerBody ? 
-                GAME_CONFIG.movementThreshold * 0.7 : 
-                GAME_CONFIG.movementThreshold;
+            else if (detectionMode.isUpperBody && !detectionMode.isLowerBody) {
+                threshold *= 0.7;
+            }
 
             // 归一化速度分数，使用非线性映射使速度变化更平滑
             velocityScore = Math.pow(Math.min(1, (velocityScore / totalDetectedParts) / threshold), 1.5);
@@ -262,8 +317,14 @@ class PoseDetector {
         this.lastScore = smoothedScore;
 
         // 更新游戏状态
-        const detectionModeText = detectionMode.isFullBody ? 
+        let detectionModeText = detectionMode.isFullBody ? 
             '全身' : (detectionMode.isUpperBody ? '上半身' : '下半身');
+            
+        // 近距离模式下更新检测模式文本
+        if (this.isCloseUpMode) {
+            detectionModeText += '(近距离模式)';
+        }
+        
         const isRunning = smoothedScore > GAME_CONFIG.runningThreshold;
         
         gameState.setState({
@@ -346,3 +407,6 @@ class PoseDetector {
 }
 
 export const poseDetector = new PoseDetector();
+
+// 将姿势检测器暴露给全局对象以便性能控制
+window.poseDetector = poseDetector;

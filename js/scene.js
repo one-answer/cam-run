@@ -1,4 +1,4 @@
-import { GAME_CONFIG } from './config.js';
+import { GAME_CONFIG, RENDER_CONFIG } from './config.js';
 
 class Scene {
     constructor() {
@@ -13,14 +13,18 @@ class Scene {
         this.terrainSystem = {
             grounds: [],
             decorations: [],
-            segmentLength: 1000,
-            segmentWidth: 100,
-            activeSegments: 5,
-            decorationsPerSegment: 15,
-            maxDecorationsPool: 300,
+            segmentLength: GAME_CONFIG.terrainSegmentLength,
+            segmentWidth: GAME_CONFIG.terrainWidth,
+            activeSegments: GAME_CONFIG.activeTerrainSegments,
+            decorationsPerSegment: GAME_CONFIG.decorationsPerSegment,
+            maxDecorationsPool: GAME_CONFIG.maxDecorationsPool,
             lastGeneratedZ: 0
         };
         this.decorationPool = [];
+        this.fps = 0;
+        this.frameCount = 0;
+        this.fpsUpdateInterval = 1000; 
+        this.lastFpsUpdate = performance.now();
     }
 
     async init() {
@@ -50,9 +54,15 @@ class Scene {
             precision: 'lowp'
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); 
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.BasicShadowMap;
+        this.renderer.shadowMap.type = THREE.BasicShadowMap; 
+        
+        this.renderer.dispose = function() {
+            this.forceContextLoss();
+            this.domElement = null;
+            this.context = null;
+        };
     }
 
     initLights() {
@@ -68,20 +78,19 @@ class Scene {
     }
 
     initTerrain() {
-        // 创建地面材质
         const groundMaterial = new THREE.MeshStandardMaterial({
             color: 0x228B22,
             roughness: 0.8,
             metalness: 0.2
         });
 
-        // 创建装饰物体（树木）
+        // 使用原始的尖形树木几何体
         const treeGeometry = new THREE.CylinderGeometry(0, 1, 4, 4);
         const treeMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
         const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, 2, 8);
         const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
 
-        // 初始化对象池
+        // 创建初始树木池
         for (let i = 0; i < this.terrainSystem.maxDecorationsPool; i++) {
             const tree = new THREE.Group();
             
@@ -95,12 +104,15 @@ class Scene {
             trunk.castShadow = true;
             tree.add(trunk);
             
+            // 随机缩放树木，使其大小多样化
+            const scale = 0.8 + Math.random() * 0.4;
+            tree.scale.set(scale, scale, scale);
+            
             tree.visible = false;
             this.scene.add(tree);
             this.decorationPool.push(tree);
         }
 
-        // 创建初始地形段
         for (let i = 0; i < this.terrainSystem.activeSegments; i++) {
             const groundGeometry = new THREE.PlaneGeometry(
                 this.terrainSystem.segmentWidth,
@@ -114,23 +126,21 @@ class Scene {
             this.terrainSystem.grounds.push(groundMesh);
             this.terrainSystem.lastGeneratedZ = (i + 1) * this.terrainSystem.segmentLength;
 
-            // 为每个地形段添加装饰物
+            // 为每个初始地形段添加更多的树木
             this.addDecorationsToSegment(i);
         }
     }
 
     addDecorationsToSegment(segmentIndex) {
-        const newSegmentDecorations = Math.floor(this.terrainSystem.decorationsPerSegment * 1.5);
+        const newSegmentDecorations = Math.floor(this.terrainSystem.decorationsPerSegment * 2);
         for (let i = 0; i < newSegmentDecorations && this.decorationPool.length > 0; i++) {
             const decoration = this.decorationPool.pop();
             decoration.visible = true;
 
-            // 随机位置
             const x = (Math.random() - 0.5) * (this.terrainSystem.segmentWidth - 10);
             const z = segmentIndex * this.terrainSystem.segmentLength + Math.random() * this.terrainSystem.segmentLength;
             decoration.position.set(x, 0, z);
 
-            // 随机旋转和缩放
             decoration.rotation.y = Math.random() * Math.PI * 2;
             const scale = 0.5 + Math.random() * 0.5;
             decoration.scale.set(scale, scale, scale);
@@ -142,45 +152,37 @@ class Scene {
     updateSpeed(speed) {
         this.speed = speed;
         
-        // 更新相机位置
-        const cameraHeight = 2 + Math.sin(performance.now() * 0.005) * (speed * 0.06); // 增加上下晃动幅度
-        const cameraX = Math.cos(performance.now() * 0.003) * (speed * 0.04); // 增加左右晃动幅度
+        const cameraHeight = 2 + Math.sin(performance.now() * 0.005) * (speed * 0.06); 
+        const cameraX = Math.cos(performance.now() * 0.003) * (speed * 0.04); 
         
-        // 平滑相机移动
-        this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, cameraHeight, 0.15); // 增加平滑插值系数
-        this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, cameraX, 0.15); // 增加平滑插值系数
-        this.camera.position.z += speed * 0.025; // 增加前进速度系数，使背景移动更快
+        this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, cameraHeight, 0.15); 
+        this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, cameraX, 0.15); 
+        this.camera.position.z += speed * 0.025; 
         
-        // 相机始终看向前方略高的位置
         const lookAtPoint = new THREE.Vector3(
             0,
             this.camera.position.y + 0.5,
-            this.camera.position.z + 12 // 增加前方看向的距离
+            this.camera.position.z + 12 
         );
         this.camera.lookAt(lookAtPoint);
 
-        // 更新地形
         this.updateTerrain();
     }
 
     updateTerrain() {
         const cameraZ = this.camera.position.z;
         
-        // 检查是否需要生成新的地形段
         if (cameraZ + this.terrainSystem.segmentLength > this.terrainSystem.lastGeneratedZ - this.terrainSystem.segmentLength) {
-            // 移除最远的地形段
             const oldGround = this.terrainSystem.grounds.shift();
             if (oldGround) {
                 oldGround.position.z = this.terrainSystem.lastGeneratedZ;
                 this.terrainSystem.grounds.push(oldGround);
                 
-                // 更新最后生成的Z坐标
                 this.terrainSystem.lastGeneratedZ += this.terrainSystem.segmentLength;
             }
             
-            // 回收和重用远处的装饰物
             const decorationsToRecycle = this.terrainSystem.decorations.filter(decoration => {
-                return decoration.position.z < cameraZ - this.terrainSystem.segmentLength * 2;
+                return decoration.position.z < cameraZ - this.terrainSystem.segmentLength * 4;
             });
             
             decorationsToRecycle.forEach(decoration => {
@@ -192,20 +194,15 @@ class Scene {
                 decoration => !decorationsToRecycle.includes(decoration)
             );
             
-            // 在新地形段添加装饰物
             const newSegmentStart = this.terrainSystem.lastGeneratedZ - this.terrainSystem.segmentLength;
             const newSegmentEnd = this.terrainSystem.lastGeneratedZ;
             
-            // 根据速度动态调整装饰物密度，但确保最小数量
-            const speedFactor = Math.max(0.5, Math.min(1.5, this.speed / 5));
-            const decorationsToAdd = Math.max(5, Math.floor(this.terrainSystem.decorationsPerSegment * speedFactor));
+            const speedFactor = Math.max(1.0, Math.min(2.0, this.speed / 5));
+            const decorationsToAdd = Math.max(15, Math.floor(this.terrainSystem.decorationsPerSegment * speedFactor));
             
-            // 确保装饰池中有足够的装饰物
             this.ensureDecorationPool();
             
-            // 添加新的装饰物
             for (let i = 0; i < decorationsToAdd; i++) {
-                // 如果装饰池为空，创建新的装饰物
                 if (this.decorationPool.length === 0) {
                     this.createNewDecoration();
                 }
@@ -213,25 +210,23 @@ class Scene {
                 const decoration = this.decorationPool.pop();
                 if (!decoration) continue;
                 
-                // 计算新位置
                 const z = newSegmentStart + (Math.random() * this.terrainSystem.segmentLength);
-                const x = (Math.random() - 0.5) * this.terrainSystem.segmentWidth * 0.8;
+                const x = (Math.random() - 0.5) * this.terrainSystem.segmentWidth * 0.9;
                 
                 decoration.position.set(x, 0, z);
+
                 decoration.rotation.y = Math.random() * Math.PI * 2;
                 decoration.visible = true;
                 
-                // 根据距离设置LOD
                 const distanceToCamera = Math.abs(z - cameraZ);
                 if (distanceToCamera > 150) {
-                    decoration.scale.setScalar(0.3);
+                    decoration.scale.setScalar(0.5);
                 } else if (distanceToCamera > 100) {
-                    decoration.scale.setScalar(0.6);
+                    decoration.scale.setScalar(0.8);
                 } else {
                     decoration.scale.setScalar(1.0);
                 }
                 
-                // 确保装饰物被添加到场景中
                 if (!this.scene.children.includes(decoration)) {
                     this.scene.add(decoration);
                 }
@@ -240,55 +235,115 @@ class Scene {
             }
         }
         
-        // 更新装饰物的LOD
         this.terrainSystem.decorations.forEach(decoration => {
             const distanceToCamera = Math.abs(decoration.position.z - cameraZ);
             let targetScale = 1.0;
             
             if (distanceToCamera > 150) {
-                targetScale = 0.3;
+                targetScale = 0.5;
             } else if (distanceToCamera > 100) {
-                targetScale = 0.6;
+                targetScale = 0.8;
             }
             
-            // 平滑缩放过渡
             decoration.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
             
-            // 确保所有装饰物都是可见的
             if (!decoration.visible) {
                 decoration.visible = true;
             }
         });
     }
     
-    // 确保装饰池中有足够的装饰物
     ensureDecorationPool() {
-        const minPoolSize = Math.max(10, this.terrainSystem.decorationsPerSegment / 2);
+        // 增加最小池大小，确保有足够的树木可以使用
+        const minPoolSize = Math.max(30, this.terrainSystem.decorationsPerSegment);
         
+        // 如果装饰物池太小，创建更多的装饰物
         while (this.decorationPool.length < minPoolSize && 
                this.decorationPool.length + this.terrainSystem.decorations.length < this.terrainSystem.maxDecorationsPool) {
             this.createNewDecoration();
         }
+        
+        // 如果总装饰物数量不足，也创建更多装饰物
+        const totalDecorations = this.decorationPool.length + this.terrainSystem.decorations.length;
+        if (totalDecorations < this.terrainSystem.maxDecorationsPool * 0.8) {
+            const decorationsToCreate = Math.min(
+                20,
+                this.terrainSystem.maxDecorationsPool - totalDecorations
+            );
+            
+            for (let i = 0; i < decorationsToCreate; i++) {
+                this.createNewDecoration();
+            }
+        }
     }
     
-    // 创建新的装饰物
     createNewDecoration() {
-        const decorationTypes = [
-            { geometry: new THREE.ConeGeometry(0.5, 2, 8), color: 0x228B22, scale: 1.5 },
-            { geometry: new THREE.BoxGeometry(0.8, 0.8, 0.8), color: 0x8B4513, scale: 1.0 },
-            { geometry: new THREE.SphereGeometry(0.6, 8, 8), color: 0x32CD32, scale: 1.2 }
+        // 只创建树木类型，但有不同形状
+        const treeTypes = [
+            // 尖形树
+            { 
+                geometry: new THREE.ConeGeometry(0, 1, 4), 
+                color: 0x228B22, 
+                scale: 1.5,
+                height: 3.5
+            },
+            // 更尖的树
+            { 
+                geometry: new THREE.ConeGeometry(0, 1.2, 6), 
+                color: 0x32CD32, 
+                scale: 1.3,
+                height: 4
+            },
+            // 圆形树冠
+            { 
+                geometry: new THREE.SphereGeometry(0.8, 8, 8), 
+                color: 0x006400, 
+                scale: 1.3,
+                height: 3
+            },
+            // 椭圆形树冠
+            {
+                geometry: new THREE.SphereGeometry(1.2, 8, 8),
+                color: 0x228B22,
+                scale: 1.2,
+                height: 3.2
+            },
+            // 宽尖形树
+            {
+                geometry: new THREE.ConeGeometry(0, 1.5, 8),
+                color: 0x006400,
+                scale: 1.4,
+                height: 3.8
+            }
         ];
         
-        const type = decorationTypes[Math.floor(Math.random() * decorationTypes.length)];
-        const material = new THREE.MeshLambertMaterial({ color: type.color });
-        const decoration = new THREE.Mesh(type.geometry, material);
+        const typeIndex = Math.floor(Math.random() * treeTypes.length);
+        const type = treeTypes[typeIndex];
         
-        decoration.castShadow = true;
-        decoration.receiveShadow = true;
-        decoration.scale.setScalar(type.scale);
-        decoration.visible = false;
+        // 创建树木
+        const tree = new THREE.Group();
         
-        this.decorationPool.push(decoration);
+        // 创建树冠
+        const crownMaterial = new THREE.MeshLambertMaterial({ color: type.color });
+        const crown = new THREE.Mesh(type.geometry, crownMaterial);
+        crown.position.y = type.height;
+        crown.castShadow = true;
+        tree.add(crown);
+        
+        // 创建树干
+        const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, type.height * 0.7, 8);
+        const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+        trunk.position.y = type.height * 0.35;
+        trunk.castShadow = true;
+        tree.add(trunk);
+        
+        tree.scale.setScalar(type.scale);
+        tree.visible = false;
+        tree.castShadow = true;
+        tree.receiveShadow = true;
+        
+        this.decorationPool.push(tree);
     }
 
     setRunningState(isRunning, targetSpeed) {
@@ -304,10 +359,52 @@ class Scene {
         this.renderer.setSize(width, height);
     }
 
+    optimizePerformance() {
+        const { dynamicQuality, lodDistances } = RENDER_CONFIG;
+        
+        // 动态质量调整
+        if (dynamicQuality && this.fps < 30) {
+            // 如果FPS低于30，逐步降低质量
+            if (this.renderer.getPixelRatio() > 1) {
+                this.renderer.setPixelRatio(this.renderer.getPixelRatio() - 0.25);
+            }
+            
+            // 减少可见装饰物，但保持更多的树木可见
+            const visibleDecorations = this.terrainSystem.decorations.filter(d => d.visible).length;
+            // 只有当可见装饰物数量超过100时才考虑隐藏一些（提高阈值）
+            if (visibleDecorations > 100) {
+                // 只隐藏非常远处的装饰物
+                const farDecorations = this.terrainSystem.decorations
+                    .filter(d => d.visible && Math.abs(d.position.z - this.camera.position.z) > lodDistances.far * 1.5) // 增加距离阈值
+                    .slice(0, Math.floor(visibleDecorations * 0.1)); // 只隐藏10%的远处装饰物（减少比例）
+                
+                farDecorations.forEach(d => {
+                    d.visible = false;
+                    this.decorationPool.push(d);
+                });
+                
+                this.terrainSystem.decorations = this.terrainSystem.decorations
+                    .filter(d => !farDecorations.includes(d));
+            }
+        }
+    }
+
     render() {
         if (!this.renderer) return;
         
-        // 更新阴影相机位置
+        // 计算FPS
+        const now = performance.now();
+        this.frameCount++;
+        
+        if (now - this.lastFpsUpdate >= this.fpsUpdateInterval) {
+            this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
+            this.lastFpsUpdate = now;
+            this.frameCount = 0;
+            
+            // 每秒执行一次性能优化
+            this.optimizePerformance();
+        }
+        
         const directionalLight = this.scene.children.find(child => child instanceof THREE.DirectionalLight);
         if (directionalLight) {
             directionalLight.position.set(

@@ -7,6 +7,9 @@ class ShadowRenderer {
         this.initialized = false;
         this.SHADOW_OPACITY = 0.8;
         this.SHADOW_BLUR = 6;
+        this.lastRenderTime = 0;
+        this.renderInterval = 50; // 降低阴影渲染频率到20fps
+        this.lowQualityMode = false;
     }
 
     init() {
@@ -19,8 +22,10 @@ class ShadowRenderer {
             return;
         }
         this.ctx = this.canvas.getContext('2d');
-        this.canvas.width = 320;
-        this.canvas.height = 240;
+        
+        // 降低阴影画布分辨率以提高性能
+        this.canvas.width = 240; // 降低分辨率
+        this.canvas.height = 180;
 
         // 离屏画布
         this.offscreenCanvas = document.createElement('canvas');
@@ -40,6 +45,13 @@ class ShadowRenderer {
     render(landmarks) {
         if (!this.initialized) this.init();
         if (!this.ctx || !landmarks) return;
+        
+        // 降低渲染频率
+        const now = performance.now();
+        if (now - this.lastRenderTime < this.renderInterval) {
+            return;
+        }
+        this.lastRenderTime = now;
 
         this.clear();
 
@@ -49,21 +61,70 @@ class ShadowRenderer {
         ctx.scale(-1, 1);
         ctx.translate(-ctx.canvas.width, 0);
 
-        // 设置模糊效果
-        ctx.filter = `blur(${this.SHADOW_BLUR}px)`;
+        // 根据性能模式设置模糊效果
+        if (this.lowQualityMode) {
+            ctx.filter = 'none'; // 禁用模糊以提高性能
+        } else {
+            ctx.filter = `blur(${this.SHADOW_BLUR}px)`;
+        }
 
-        // 绘制身体各部分
-        this.drawTorso(ctx, landmarks);  // 躯干
-        this.drawLimbs(ctx, landmarks);  // 四肢
-        this.drawHead(ctx, landmarks);   // 头部
+        // 简化绘制，只绘制主要部分
+        if (this.lowQualityMode) {
+            this.drawSimplifiedShadow(ctx, landmarks);
+        } else {
+            // 绘制身体各部分
+            this.drawTorso(ctx, landmarks);  // 躯干
+            this.drawLimbs(ctx, landmarks);  // 四肢
+            this.drawHead(ctx, landmarks);   // 头部
+        }
 
         ctx.restore();
 
         // 将离屏画布的内容绘制到主画布
         this.ctx.save();
-        this.ctx.globalAlpha = 0.4;  // 整体透明度
+        this.ctx.globalAlpha = this.lowQualityMode ? 0.3 : 0.4;  // 降低透明度以提高性能
         this.ctx.drawImage(this.offscreenCanvas, 0, 0);
         this.ctx.restore();
+    }
+    
+    // 简化的阴影绘制，只绘制一个整体轮廓
+    drawSimplifiedShadow(ctx, landmarks) {
+        // 找出所有关键点的边界
+        const points = landmarks.filter(point => point && point.visibility > 0.5);
+        if (points.length < 5) return;
+        
+        // 计算中心点
+        let sumX = 0, sumY = 0, count = 0;
+        points.forEach(point => {
+            sumX += point.x;
+            sumY += point.y;
+            count++;
+        });
+        
+        const centerX = (sumX / count) * ctx.canvas.width;
+        const centerY = (sumY / count) * ctx.canvas.height;
+        
+        // 计算半径（简单地取最远点的距离）
+        let maxDist = 0;
+        points.forEach(point => {
+            const dx = point.x * ctx.canvas.width - centerX;
+            const dy = point.y * ctx.canvas.height - centerY;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            maxDist = Math.max(maxDist, dist);
+        });
+        
+        // 绘制简单的圆形阴影
+        const gradient = ctx.createRadialGradient(
+            centerX, centerY, 0,
+            centerX, centerY, maxDist * 1.2
+        );
+        gradient.addColorStop(0, `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`);
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY, maxDist * 1.2, maxDist * 0.8, 0, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
     }
 
     drawTorso(ctx, landmarks) {
@@ -197,6 +258,9 @@ class ShadowRenderer {
 }
 
 export const shadowRenderer = new ShadowRenderer();
+
+// 将阴影渲染器暴露给全局对象以便性能控制
+window.shadowRenderer = shadowRenderer;
 
 // 全局变量，用于跟踪步数和运动状态
 let stepCount = 0;

@@ -8,11 +8,31 @@ export const GAME_CONFIG = {
     bufferSize: 10,          // 减少缓冲区大小以更快地响应变化
     requiredConsecutiveMovements: 8,  // 减少连续运动检测次数要求
 
+    // 速度颜色阈值
+    speedColorThresholds: {
+        slow: 2.0,            // 低于此值为慢速 (红色)
+        medium: 4.0,          // 低于此值为中速 (黄色)，高于为快速 (绿色)
+    },
+    speedColors: {
+        slow: '#B81D13',      // 慢速 - 红色
+        medium: '#EFB700',    // 中速 - 黄色
+        fast: '#008450',      // 快速 - 绿色
+    },
+
     // 姿势检测
     poseConfidenceThreshold: 0.5,    // 提高姿势检测要求
     calibrationFrames: 20,           // 保持校准帧数要求
     movementThreshold: 2.2,          // 提高运动强度阈值
     stepDetectionThreshold: 0.4,     // 提高步伐检测阈值，确保只有明显的动作才会被计为步伐
+
+    // 新增：近距离检测模式参数
+    closeUpDetection: {
+        enabled: true,                // 启用近距离检测模式
+        upperBodyFocusThreshold: 0.7, // 当上半身可见度高于此值但下半身可见度低于此值时，启用上半身专注模式
+        movementThresholdMultiplier: 0.7, // 近距离模式下运动阈值的乘数（降低阈值使检测更灵敏）
+        armMovementWeight: 1.5,       // 近距离模式下手臂运动的权重增加
+        shoulderDistanceThreshold: 0.3, // 肩膀距离阈值，用于检测用户是否靠近摄像头
+    },
 
     // 运动评估参数
     motionEvaluation: {
@@ -30,8 +50,8 @@ export const GAME_CONFIG = {
     terrainSegmentLength: 1000,
     terrainWidth: 100,
     activeTerrainSegments: 5,
-    decorationsPerSegment: 15,
-    maxDecorationsPool: 300,
+    decorationsPerSegment: 30,       // 增加每个地形段的装饰物（树木）数量，从15增加到30
+    maxDecorationsPool: 500,         // 增加最大装饰物池大小，从300增加到500
 
     // 步伐检测相关参数
     minStepInterval: 150,            // 进一步减少最小步伐间隔（毫秒），使步数增长更快
@@ -64,8 +84,15 @@ export const SKELETON_CONFIG = {
 
 // 渲染设置
 export const RENDER_CONFIG = {
-    shadowMapSize: 2048,
+    shadowMapSize: 1024,  // 阴影贴图大小
     maxFPS: 60,
+    dynamicQuality: true,       // 动态质量调整
+    maxDecorations: 200,        // 最大装饰物数量
+    lodDistances: {             // 细节层次距离
+        near: 80,
+        medium: 120,
+        far: 160
+    }
 };
 
 // 调试设置

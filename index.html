@@ -99,6 +99,30 @@
         .status-error {
             color: #F44336;
         }
+        
+        /* 速度指示器样式 */
+        .speed-indicator {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: white;
+            margin-left: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        .speed-slow {
+            background-color: #B81D13;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+        }
+        .speed-medium {
+            background-color: #EFB700;
+            color: #333; /* 黄色背景上使用深色文字更易读 */
+        }
+        .speed-fast {
+            background-color: #008450;
+            text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
@@ -109,7 +133,7 @@
     <div id="gameStatus">
         游戏状态 (FPS: <span id="fps">0</span>)<br>
         动作质量: <span id="quality">0.0%</span><br>
-        当前速度: <span id="speed">0.0 m/s</span> (等待开始奔跑...)<br>
+        <span id="speed">当前速度: 0.0 m/s </span><br>
         步数: <span id="steps">0</span><br>
         调试信息: <span id="debug">准备开始...</span>
     </div>
