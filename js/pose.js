@@ -10,6 +10,7 @@ class PoseDetector {
         this.lastPoseTime = 0;
         this.positionHistory = null;
         this.lastScore = null;
+        this.currentArmPhase = 'neutral'; // 新增：当前手臂相位
     }
 
     async init() {
@@ -44,6 +45,9 @@ class PoseDetector {
 
         // 设置结果回调
         this.detector.onResults((results) => this.onPoseResults(results));
+        
+        // 为全局访问设置当前手臂相位
+        window.currentArmPhase = 'neutral';
     }
 
     async startDetection() {
@@ -108,8 +112,21 @@ class PoseDetector {
         const upperBodyVisible = checkVisibility(upperBodyPoints);
         const lowerBodyVisible = checkVisibility(lowerBodyPoints);
 
-        // 如果上下半身都不可见，则停止检测
-        if (!upperBodyVisible && !lowerBodyVisible) {
+        // 检查手臂和腿部的完整性
+        const leftArmComplete = checkVisibility([11, 13, 15]); // 左肩到左手
+        const rightArmComplete = checkVisibility([12, 14, 16]); // 右肩到右手
+        const leftLegComplete = checkVisibility([23, 25, 27]); // 左髋到左脚
+        const rightLegComplete = checkVisibility([24, 26, 28]); // 右髋到右脚
+
+        // 确定当前检测模式
+        const detectionMode = {
+            isUpperBody: upperBodyVisible && (leftArmComplete || rightArmComplete),
+            isLowerBody: lowerBodyVisible && (leftLegComplete || rightLegComplete),
+            isFullBody: upperBodyVisible && lowerBodyVisible
+        };
+
+        // 如果没有足够的关键点可见，则停止检测
+        if (!detectionMode.isUpperBody && !detectionMode.isLowerBody) {
             gameState.setState({ 
                 currentSpeed: 0,
                 movementQuality: 0,
@@ -130,9 +147,10 @@ class PoseDetector {
 
         let velocityScore = 0;
         let totalDetectedParts = 0;
+        let coordinationScore = 0;
 
         // 分析手臂运动
-        if (upperBodyVisible) {
+        if (detectionMode.isUpperBody) {
             // 获取手臂关键点的当前位置
             const leftArm = {
                 shoulder: landmarks[11],
@@ -165,12 +183,24 @@ class PoseDetector {
                 Math.abs(rightArmVelocity.x) * 0.5
             ) / 2;
             
-            velocityScore += armVelocityScore;
+            // 检查手臂协调性
+            if (leftArmComplete && rightArmComplete) {
+                const leftArmY = leftArm.wrist.y;
+                const rightArmY = rightArm.wrist.y;
+                if (Math.abs(leftArmY - rightArmY) > 0.15) {
+                    coordinationScore = 1.0;
+                }
+            }
+            
+            velocityScore += armVelocityScore * (detectionMode.isFullBody ? 0.6 : 1.0);
             totalDetectedParts++;
+            
+            // 新增：检测手臂相位，用于步数计算
+            this.detectAndUpdateArmPhase(leftArm, rightArm);
         }
 
         // 分析腿部运动
-        if (lowerBodyVisible) {
+        if (detectionMode.isLowerBody) {
             // 获取腿部关键点的当前位置
             const leftLeg = {
                 hip: landmarks[23],
@@ -210,34 +240,70 @@ class PoseDetector {
         // 根据可见部位调整分数
         if (totalDetectedParts > 0) {
             // 如果只有上半身可见，稍微降低运动阈值
-            const threshold = upperBodyVisible && !lowerBodyVisible ? 
+            const threshold = detectionMode.isUpperBody && !detectionMode.isLowerBody ? 
                 GAME_CONFIG.movementThreshold * 0.7 : 
                 GAME_CONFIG.movementThreshold;
 
-            // 归一化速度分数
-            velocityScore = Math.min(1, (velocityScore / totalDetectedParts) / threshold);
+            // 归一化速度分数，使用非线性映射使速度变化更平滑
+            velocityScore = Math.pow(Math.min(1, (velocityScore / totalDetectedParts) / threshold), 1.5);
+
+            // 如果检测到良好的动作协调性，给予额外加分
+            if (coordinationScore > 0.8) {
+                velocityScore *= 1.2;
+            }
         } else {
             velocityScore = 0;
         }
         
-        // 应用平滑处理
+        // 应用平滑处理，增加历史权重以减少抖动
         const smoothedScore = this.lastScore ? 
-            this.lastScore * 0.7 + velocityScore * 0.3 : 
+            this.lastScore * 0.8 + velocityScore * 0.2 : 
             velocityScore;
         this.lastScore = smoothedScore;
 
         // 更新游戏状态
-        const detectionMode = upperBodyVisible && lowerBodyVisible ? 
-            '全身' : (upperBodyVisible ? '上半身' : '下半身');
+        const detectionModeText = detectionMode.isFullBody ? 
+            '全身' : (detectionMode.isUpperBody ? '上半身' : '下半身');
         const isRunning = smoothedScore > GAME_CONFIG.runningThreshold;
         
         gameState.setState({
             movementQuality: Math.round(smoothedScore * 100),
             debugInfo: isRunning ? 
-                `${detectionMode}运动中 (速度: ${Math.round(smoothedScore * 100)}%)` : 
-                `等待${detectionMode}运动...`
+                `${detectionModeText}运动中 (速度: ${Math.round(smoothedScore * 100)}%)` : 
+                `等待${detectionModeText}运动...`
         });
         gameState.updateMovement(isRunning ? smoothedScore : 0);
+    }
+    
+    // 新增：检测并更新手臂相位
+    detectAndUpdateArmPhase(leftArm, rightArm) {
+        if (!leftArm || !rightArm || !leftArm.wrist || !rightArm.wrist) {
+            return;
+        }
+        
+        // 根据手腕的Y坐标判断哪只手臂抬得更高
+        const leftWristY = leftArm.wrist.y;
+        const rightWristY = rightArm.wrist.y;
+        
+        // 使用配置中的阈值，防止微小变化导致相位变化
+        const threshold = GAME_CONFIG.armPhaseThreshold;
+        
+        let newPhase = 'neutral';
+        
+        if (leftWristY < rightWristY - threshold) {
+            // 左手抬得更高
+            newPhase = 'left_up';
+        } else if (rightWristY < leftWristY - threshold) {
+            // 右手抬得更高
+            newPhase = 'right_up';
+        }
+        
+        // 只有当相位真正变化时才更新
+        if (newPhase !== this.currentArmPhase) {
+            this.currentArmPhase = newPhase;
+            // 更新全局变量，供gameState使用
+            window.currentArmPhase = newPhase;
+        }
     }
 
     // 计算两点间的速度
@@ -249,6 +315,28 @@ class PoseDetector {
             x: (current.x - previous.x) / timeDelta,
             y: (current.y - previous.y) / timeDelta
         };
+    }
+
+    detectArmPhase() {
+        if (!this.positionHistory || !this.positionHistory.leftArm.length) return 'neutral';
+        
+        const leftArm = this.positionHistory.leftArm[0];
+        const rightArm = this.positionHistory.rightArm[0];
+        
+        if (!leftArm || !rightArm) return 'neutral';
+        
+        return leftArm.wrist.y < rightArm.wrist.y ? 'left_up' : 'right_up';
+    }
+
+    detectLegPhase() {
+        if (!this.positionHistory || !this.positionHistory.leftLeg.length) return 'neutral';
+        
+        const leftLeg = this.positionHistory.leftLeg[0];
+        const rightLeg = this.positionHistory.rightLeg[0];
+        
+        if (!leftLeg || !rightLeg) return 'neutral';
+        
+        return leftLeg.knee.y < rightLeg.knee.y ? 'left_up' : 'right_up';
     }
 
     calibrate() {

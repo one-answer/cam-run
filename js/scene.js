@@ -143,19 +143,19 @@ class Scene {
         this.speed = speed;
         
         // 更新相机位置
-        const cameraHeight = 2 + Math.sin(performance.now() * 0.004) * (speed * 0.05); // 添加上下晃动
-        const cameraX = Math.cos(performance.now() * 0.002) * (speed * 0.03); // 添加左右晃动
+        const cameraHeight = 2 + Math.sin(performance.now() * 0.005) * (speed * 0.06); // 增加上下晃动幅度
+        const cameraX = Math.cos(performance.now() * 0.003) * (speed * 0.04); // 增加左右晃动幅度
         
         // 平滑相机移动
-        this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, cameraHeight, 0.1);
-        this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, cameraX, 0.1);
-        this.camera.position.z += speed * 0.016; // 保持稳定的前进速度
+        this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, cameraHeight, 0.15); // 增加平滑插值系数
+        this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, cameraX, 0.15); // 增加平滑插值系数
+        this.camera.position.z += speed * 0.025; // 增加前进速度系数，使背景移动更快
         
         // 相机始终看向前方略高的位置
         const lookAtPoint = new THREE.Vector3(
             0,
             this.camera.position.y + 0.5,
-            this.camera.position.z + 10
+            this.camera.position.z + 12 // 增加前方看向的距离
         );
         this.camera.lookAt(lookAtPoint);
 
@@ -196,11 +196,20 @@ class Scene {
             const newSegmentStart = this.terrainSystem.lastGeneratedZ - this.terrainSystem.segmentLength;
             const newSegmentEnd = this.terrainSystem.lastGeneratedZ;
             
-            // 根据速度动态调整装饰物密度
+            // 根据速度动态调整装饰物密度，但确保最小数量
             const speedFactor = Math.max(0.5, Math.min(1.5, this.speed / 5));
-            const decorationsToAdd = Math.floor(this.terrainSystem.decorationsPerSegment * speedFactor);
+            const decorationsToAdd = Math.max(5, Math.floor(this.terrainSystem.decorationsPerSegment * speedFactor));
             
-            for (let i = 0; i < decorationsToAdd && this.decorationPool.length > 0; i++) {
+            // 确保装饰池中有足够的装饰物
+            this.ensureDecorationPool();
+            
+            // 添加新的装饰物
+            for (let i = 0; i < decorationsToAdd; i++) {
+                // 如果装饰池为空，创建新的装饰物
+                if (this.decorationPool.length === 0) {
+                    this.createNewDecoration();
+                }
+                
                 const decoration = this.decorationPool.pop();
                 if (!decoration) continue;
                 
@@ -222,6 +231,11 @@ class Scene {
                     decoration.scale.setScalar(1.0);
                 }
                 
+                // 确保装饰物被添加到场景中
+                if (!this.scene.children.includes(decoration)) {
+                    this.scene.add(decoration);
+                }
+                
                 this.terrainSystem.decorations.push(decoration);
             }
         }
@@ -239,7 +253,42 @@ class Scene {
             
             // 平滑缩放过渡
             decoration.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+            
+            // 确保所有装饰物都是可见的
+            if (!decoration.visible) {
+                decoration.visible = true;
+            }
         });
+    }
+    
+    // 确保装饰池中有足够的装饰物
+    ensureDecorationPool() {
+        const minPoolSize = Math.max(10, this.terrainSystem.decorationsPerSegment / 2);
+        
+        while (this.decorationPool.length < minPoolSize && 
+               this.decorationPool.length + this.terrainSystem.decorations.length < this.terrainSystem.maxDecorationsPool) {
+            this.createNewDecoration();
+        }
+    }
+    
+    // 创建新的装饰物
+    createNewDecoration() {
+        const decorationTypes = [
+            { geometry: new THREE.ConeGeometry(0.5, 2, 8), color: 0x228B22, scale: 1.5 },
+            { geometry: new THREE.BoxGeometry(0.8, 0.8, 0.8), color: 0x8B4513, scale: 1.0 },
+            { geometry: new THREE.SphereGeometry(0.6, 8, 8), color: 0x32CD32, scale: 1.2 }
+        ];
+        
+        const type = decorationTypes[Math.floor(Math.random() * decorationTypes.length)];
+        const material = new THREE.MeshLambertMaterial({ color: type.color });
+        const decoration = new THREE.Mesh(type.geometry, material);
+        
+        decoration.castShadow = true;
+        decoration.receiveShadow = true;
+        decoration.scale.setScalar(type.scale);
+        decoration.visible = false;
+        
+        this.decorationPool.push(decoration);
     }
 
     setRunningState(isRunning, targetSpeed) {
