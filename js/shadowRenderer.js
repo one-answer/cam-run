@@ -144,13 +144,24 @@ class ShadowRenderer {
         ctx.strokeStyle = gradient;
         ctx.stroke();
 
-        // 在关节处添加圆形
-        [points[0], points[1], points[2]].forEach(point => {
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, 8, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
-            ctx.fill();
-        });
+        // 在关节处添加圆形，但不在肘部(中间点)添加明显的圆形
+        // 只在起点和终点添加较大的圆形
+        ctx.beginPath();
+        ctx.arc(points[0].x, points[0].y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
+        ctx.fill();
+        
+        // 肘部(中间点)不添加明显的圆形阴影
+        // 如果需要保留一点连续性，可以添加非常小且透明度低的圆形
+        ctx.beginPath();
+        ctx.arc(points[1].x, points[1].y, 3, 0, Math.PI * 2); // 减小半径
+        ctx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY * 0.3})`; // 降低透明度
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(points[2].x, points[2].y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
+        ctx.fill();
     }
 
     drawHead(ctx, landmarks) {
