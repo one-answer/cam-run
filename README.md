@@ -48,7 +48,9 @@
 MIT License
 
 ## 打赏
-如果你觉得好，可以为我买杯咖啡。
-[![这是图片](https://raw.githubusercontent.com/Ximi1970/Donate/master/paypal_btn_donateCC_LG_1.gif "")]
-(https://paypal.me/jameszhai78)
+如果你觉得好，可以为我买杯咖啡：
+
+
+[![paypal](https://github.com/Ximi1970/Donate/blob/master/paypal_btn_donateCC_LG_1.gif)](https://paypal.me/jameszhai78)
+
 
