@@ -196,8 +196,24 @@ class GameState {
                     speedText + '</span>';
             }
             
+            // 右下角速度显示 - 同步更新并应用相同的样式类
+            const speedBottomElement = document.getElementById('speed-bottom');
+            if (speedBottomElement) {
+                if (this.state.currentSpeed === 0) {
+                    speedBottomElement.textContent = speedText;
+                } else {
+                    speedBottomElement.innerHTML = '<span class="' + speedClass + '">' + speedText + '</span>';
+                }
+            }
+            
             // 更新步数
             document.getElementById('steps').textContent = this.state.stepCount;
+            
+            // 更新右下角步数
+            const stepsBottomElement = document.getElementById('steps-bottom');
+            if (stepsBottomElement) {
+                stepsBottomElement.textContent = this.state.stepCount;
+            }
             
             // 更新调试信息
             document.getElementById('debug').textContent = this.state.debugInfo;

@@ -85,7 +85,6 @@
             position: fixed;
             top: 20px;
             left: 20px;
-            background: rgba(255, 255, 255, 0.8);
             padding: 10px;
             border-radius: 5px;
             z-index: 100;
@@ -123,6 +122,14 @@
             background-color: #008450;
             text-shadow: 0 1px 1px rgba(0,0,0,0.3);
         }
+        
+        /* 右下角速度显示样式 */
+        #metrics-display span span {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -130,7 +137,7 @@
     <video id="webcamView" playsinline></video>
     <canvas id="skeletonCanvas"></canvas>
     <canvas id="shadowCanvas"></canvas>
-    <div id="gameStatus">
+    <div id="gameStatus" style="display:none">
         游戏状态 (FPS: <span id="fps">0</span>)<br>
         动作质量: <span id="quality">0.0%</span><br>
         <span id="speed">当前速度: 0.0 m/s </span><br>
@@ -140,11 +147,16 @@
     <div id="instructions">
         <h2>Webcam Runner 3D</h2>
         <p>跑步姿势：原地跑步</p>
-        <p>速度：根据跑步频率自动调整</p>
-        <button id="calibrateBtn" style="padding: 10px 20px; margin: 10px; font-size: 16px; cursor: pointer;">开始校准</button>
     </div>
-    <div id="fps">FPS: <span id="fpsValue">0</span></div>
     <div id="gameState"></div>
+    <div id="metrics-display" style="position: fixed; bottom: 20px; right: 20px; background: rgba(0, 0, 0, 0.7); padding: 15px; border-radius: 10px; color: white; font-family: Arial, sans-serif;">
+      <div style="font-size: 24px; font-weight: bold;">
+        <span>🏃‍♂️ Speed: </span><span id="speed-bottom">0 km/h</span>
+      </div>
+      <div style="font-size: 24px; font-weight: bold; margin-top: 10px;">
+        <span>👣 Steps: </span><span id="steps-bottom">0</span>
+      </div>
+    </div>
     <!-- 第三方库 -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <!-- 游戏模块 -->

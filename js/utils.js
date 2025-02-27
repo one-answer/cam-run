@@ -34,33 +34,3 @@ export function getAngle(a, b, c) {
     // 转换为角度
     return angle * (180 / Math.PI);
 }
-
-// FPS计算相关
-export class FPSCounter {
-    constructor() {
-        this.frameCount = 0;
-        this.lastTime = performance.now();
-        this.fpsHistory = [];
-    }
-
-    update() {
-        this.frameCount++;
-        const currentTime = performance.now();
-        const deltaTime = currentTime - this.lastTime;
-
-        if (deltaTime >= 1000) {
-            const fps = Math.round((this.frameCount * 1000) / deltaTime);
-            this.fpsHistory.push(fps);
-            
-            if (this.fpsHistory.length > 60) {
-                this.fpsHistory.shift();
-            }
-
-            const avgFps = Math.round(average(this.fpsHistory));
-            document.getElementById('fpsValue').textContent = avgFps;
-
-            this.frameCount = 0;
-            this.lastTime = currentTime;
-        }
-    }
-}

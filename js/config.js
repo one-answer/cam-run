@@ -50,8 +50,8 @@ export const GAME_CONFIG = {
     terrainSegmentLength: 1000,
     terrainWidth: 100,
     activeTerrainSegments: 5,
-    decorationsPerSegment: 30,       // 增加每个地形段的装饰物（树木）数量，从15增加到30
-    maxDecorationsPool: 500,         // 增加最大装饰物池大小，从300增加到500
+    decorationsPerSegment: 50,       // 增加每个地形段的装饰物（树木）数量，从30增加到50
+    maxDecorationsPool: 800,         // 增加最大装饰物池大小，从500增加到800
 
     // 步伐检测相关参数
     minStepInterval: 150,            // 进一步减少最小步伐间隔（毫秒），使步数增长更快
@@ -87,11 +87,11 @@ export const RENDER_CONFIG = {
     shadowMapSize: 1024,  // 阴影贴图大小
     maxFPS: 60,
     dynamicQuality: true,       // 动态质量调整
-    maxDecorations: 200,        // 最大装饰物数量
+    maxDecorations: 400,        // 最大装饰物数量，从200增加到400
     lodDistances: {             // 细节层次距离
-        near: 80,
-        medium: 120,
-        far: 160
+        near: 120,              // 从80增加到120
+        medium: 180,            // 从120增加到180
+        far: 240                // 从160增加到240
     }
 };
 

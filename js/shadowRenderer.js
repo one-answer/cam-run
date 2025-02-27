@@ -58,8 +58,8 @@ class ShadowRenderer {
         // 在离屏画布上绘制
         const ctx = this.offscreenCtx;
         ctx.save();
-        ctx.scale(-1, 1);
-        ctx.translate(-ctx.canvas.width, 0);
+        //ctx.scale(-1, 1);
+        //ctx.translate(-ctx.canvas.width, 0);
 
         // 根据性能模式设置模糊效果
         if (this.lowQualityMode) {
