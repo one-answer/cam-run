@@ -28,10 +28,10 @@ export const GAME_CONFIG = {
     // 新增：近距离检测模式参数
     closeUpDetection: {
         enabled: true,                // 启用近距离检测模式
-        upperBodyFocusThreshold: 0.7, // 当上半身可见度高于此值但下半身可见度低于此值时，启用上半身专注模式
-        movementThresholdMultiplier: 0.7, // 近距离模式下运动阈值的乘数（降低阈值使检测更灵敏）
-        armMovementWeight: 1.5,       // 近距离模式下手臂运动的权重增加
-        shoulderDistanceThreshold: 0.3, // 肩膀距离阈值，用于检测用户是否靠近摄像头
+        upperBodyFocusThreshold: 0.6, // 降低上半身可见度阈值，使其更容易进入近距离模式
+        movementThresholdMultiplier: 0.6, // 进一步降低近距离模式下的运动阈值，使检测更灵敏
+        armMovementWeight: 1.8,       // 增加近距离模式下手臂运动的权重
+        shoulderDistanceThreshold: 0.25, // 降低肩膀距离阈值，使系统更容易识别近距离状态
     },
     
     // 新增：体重估算参数

@@ -1,4 +1,4 @@
-﻿import { renderer } from './renderer.js';
+import { renderer } from './renderer.js';
 import { gameState } from './gameState.js';
 import { GAME_CONFIG } from './config.js';
 
@@ -109,22 +109,14 @@ class PoseDetector {
                     Math.pow(leftShoulder.y - rightShoulder.y, 2)
                 );
                 
-                // 添加调试信息
-                //console.log('肩膀距离:', window.currentShoulderDistance);
-                //console.log('左肩坐标:', leftShoulder.x, leftShoulder.y);
-                //console.log('右肩坐标:', rightShoulder.x, rightShoulder.y);
-                
-                // 检查可见度
-                //console.log('左肩可见度:', leftShoulder.visibility);
-                //console.log('右肩可见度:', rightShoulder.visibility);
-                
                 // 更新调试信息到游戏状态
+                const modeText = this.isCloseUpMode ? "近距离模式" : "正常模式";
                 gameState.setState({ 
-                    debugInfo: `肩膀距离: ${window.currentShoulderDistance.toFixed(3)}`
+                    debugInfo: `${modeText} (肩距: ${window.currentShoulderDistance.toFixed(3)})`
                 });
             } else {
                 window.currentShoulderDistance = null;
-                //console.log('未检测到肩膀关键点');
+                gameState.setState({ debugInfo: '未检测到肩膀关键点' });
             }
         } catch (error) {
             console.error('处理姿势结果错误:', error);
@@ -191,11 +183,11 @@ class PoseDetector {
                 Math.pow(leftShoulder.y - rightShoulder.y, 2)
             );
             
-            // 当肩膀距离大于阈值，且上半身可见性好但下半身可见性差时，判定为近距离模式
+            // 当肩膀距离大于阈值，且上半身可见性好时，判定为近距离模式
+            // 不再严格要求下半身可见性差，这样可以更容易进入近距离模式
             this.isCloseUpMode = GAME_CONFIG.closeUpDetection.enabled && 
                                  this.shoulderDistance > GAME_CONFIG.closeUpDetection.shoulderDistanceThreshold &&
-                                 upperBodyVisibility > GAME_CONFIG.closeUpDetection.upperBodyFocusThreshold &&
-                                 lowerBodyVisibility < GAME_CONFIG.closeUpDetection.upperBodyFocusThreshold;
+                                 upperBodyVisibility > GAME_CONFIG.closeUpDetection.upperBodyFocusThreshold;
         }
 
         // 如果没有足够的关键点可见，则停止检测
@@ -258,7 +250,12 @@ class PoseDetector {
             
             // 近距离模式下增加手臂运动的权重
             if (this.isCloseUpMode) {
+                // 增加近距离模式下的手臂运动检测灵敏度
                 armVelocityScore *= GAME_CONFIG.closeUpDetection.armMovementWeight;
+                
+                // 在近距离模式下，增加水平方向运动的权重，因为近距离时水平运动更明显
+                const horizontalBonus = (Math.abs(leftArmVelocity.x) + Math.abs(rightArmVelocity.x)) * 0.3;
+                armVelocityScore += horizontalBonus;
             }
             
             // 检查手臂协调性
@@ -323,6 +320,12 @@ class PoseDetector {
             // 近距离模式下调整阈值
             if (this.isCloseUpMode) {
                 threshold *= GAME_CONFIG.closeUpDetection.movementThresholdMultiplier;
+                
+                // 根据肩膀距离动态调整阈值，距离越大（越近），阈值越低（更灵敏）
+                if (this.shoulderDistance > GAME_CONFIG.closeUpDetection.shoulderDistanceThreshold) {
+                    const distanceFactor = Math.min(1, (this.shoulderDistance - GAME_CONFIG.closeUpDetection.shoulderDistanceThreshold) * 2);
+                    threshold *= (1 - distanceFactor * 0.3); // 最多再降低30%的阈值
+                }
             }
             // 如果只有上半身可见，稍微降低运动阈值
             else if (detectionMode.isUpperBody && !detectionMode.isLowerBody) {
@@ -352,16 +355,15 @@ class PoseDetector {
             
         // 近距离模式下更新检测模式文本
         if (this.isCloseUpMode) {
-            detectionModeText += '(近距离模式)';
+            detectionModeText = '近距离';
         }
         
         const isRunning = smoothedScore > GAME_CONFIG.runningThreshold;
         
+        // 不在这里更新debugInfo，避免与onPoseResults中的信息冲突
+        // 只更新运动相关的状态
         gameState.setState({
-            movementQuality: Math.round(smoothedScore * 100),
-            debugInfo: isRunning ? 
-                `${detectionModeText}运动中 (速度: ${Math.round(smoothedScore * 100)}%)` : 
-                `等待${detectionModeText}运动...`
+            movementQuality: Math.round(smoothedScore * 100)
         });
         gameState.updateMovement(isRunning ? smoothedScore : 0);
     }
