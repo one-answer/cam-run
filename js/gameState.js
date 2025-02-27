@@ -7,6 +7,7 @@ class GameState {
             movementQuality: 0,
             currentSpeed: 0,
             stepCount: 0,
+            caloriesBurned: 0, // 新增：卡路里消耗
             debugInfo: '',
             isCloseUpMode: false  // 新增：是否处于近距离模式
         };
@@ -22,6 +23,10 @@ class GameState {
         // 新增：手臂运动检测相关变量（用于近距离模式）
         this.armMovementHistory = [];
         this.lastArmMovementTime = 0;
+        
+        // 新增：卡路里计算相关变量
+        this.lastCalorieUpdateTime = 0;
+        this.calorieCalculationInterval = 1000; // 每秒更新一次卡路里
     }
 
     getState() {
@@ -39,6 +44,7 @@ class GameState {
             movementQuality: 0,
             currentSpeed: 0,
             stepCount: 0,
+            caloriesBurned: 0, // 重置卡路里计数
             debugInfo: '',
             isCloseUpMode: false
         };
@@ -49,6 +55,7 @@ class GameState {
         this.stepDetectionCooldown = false;
         this.armMovementHistory = [];
         this.lastArmMovementTime = 0;
+        this.lastCalorieUpdateTime = 0;
         this.updateDisplay();
     }
 
@@ -65,6 +72,9 @@ class GameState {
             
             // 检测步数 - 使用更合理的步数检测机制
             this.detectAndCountSteps(quality);
+            
+            // 计算卡路里消耗
+            this.calculateCalories();
         } else {
             this.state.currentSpeed = Math.max(
                 0,
@@ -76,7 +86,41 @@ class GameState {
         this.updateDisplay();
     }
     
-    // 基于手臂位置变化的步数检测
+    // 新增：计算卡路里消耗
+    calculateCalories() {
+        const now = performance.now();
+        
+        // 每秒更新一次卡路里
+        if (now - this.lastCalorieUpdateTime >= this.calorieCalculationInterval) {
+            // 基于当前速度和时间间隔计算卡路里
+            // 假设体重为70kg的人，根据MET值计算卡路里消耗
+            // 慢跑 MET ≈ 7, 中速跑 MET ≈ 10, 快速跑 MET ≈ 12.5
+            
+            let met = 0;
+            if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.slow) {
+                met = 7; // 慢跑
+            } else if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.medium) {
+                met = 10; // 中速跑
+            } else {
+                met = 12.5; // 快速跑
+            }
+            
+            // 卡路里计算公式: 卡路里 = MET * 体重(kg) * 时间(小时)
+            // 假设体重为70kg，时间转换为小时
+            const weight = 70; // kg
+            const timeInHours = (now - this.lastCalorieUpdateTime) / 1000 / 60 / 60;
+            
+            // 计算这段时间内消耗的卡路里
+            const caloriesBurned = met * weight * timeInHours;
+            
+            // 累加到总卡路里
+            this.state.caloriesBurned += caloriesBurned;
+            
+            // 更新最后计算时间
+            this.lastCalorieUpdateTime = now;
+        }
+    }
+
     detectAndCountSteps(quality) {
         const now = performance.now();
         
@@ -213,6 +257,16 @@ class GameState {
             const stepsBottomElement = document.getElementById('steps-bottom');
             if (stepsBottomElement) {
                 stepsBottomElement.textContent = this.state.stepCount;
+            }
+            
+            // 更新卡路里消耗
+            document.getElementById('calories').textContent = 
+                this.state.caloriesBurned.toFixed(1);
+            
+            // 更新右下角卡路里消耗
+            const caloriesBottomElement = document.getElementById('calories-bottom');
+            if (caloriesBottomElement) {
+                caloriesBottomElement.textContent = this.state.caloriesBurned.toFixed(1);
             }
             
             // 更新调试信息
