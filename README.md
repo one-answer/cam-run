@@ -47,6 +47,8 @@
 ## 许可证
 MIT License
 
-## 联系方式
-- 项目维护者：[Your Name]
-- 邮箱：[Your Email]
+## 打赏
+如果你觉得好，可以为我买杯咖啡。
+[![这是图片](https://raw.githubusercontent.com/Ximi1970/Donate/master/paypal_btn_donateCC_LG_1.gif "")]
+(https://paypal.me/jameszhai78)
+
