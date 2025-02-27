@@ -7,9 +7,13 @@ class GameState {
             movementQuality: 0,
             currentSpeed: 0,
             stepCount: 0,
-            caloriesBurned: 0, // 新增：卡路里消耗
+            caloriesBurned: 0,
+            userWeight: 60, // 默认体重60kg
             debugInfo: '',
-            isCloseUpMode: false  // 新增：是否处于近距离模式
+            isCloseUpMode: false,
+            shoulderDistance: 0,
+            estimatedHeight: 0,
+            shoulderDistanceHistory: []
         };
         this.lastUpdate = 0;
         this.movementBuffer = [];
@@ -27,6 +31,9 @@ class GameState {
         // 新增：卡路里计算相关变量
         this.lastCalorieUpdateTime = 0;
         this.calorieCalculationInterval = 1000; // 每秒更新一次卡路里
+        
+        // 初始化体重修改功能
+        this.initWeightModification();
     }
 
     getState() {
@@ -44,9 +51,13 @@ class GameState {
             movementQuality: 0,
             currentSpeed: 0,
             stepCount: 0,
-            caloriesBurned: 0, // 重置卡路里计数
+            caloriesBurned: 0,
+            userWeight: this.state.userWeight, // 保留当前体重
             debugInfo: '',
-            isCloseUpMode: false
+            isCloseUpMode: false,
+            shoulderDistance: 0,
+            estimatedHeight: 0,
+            shoulderDistanceHistory: []
         };
         this.movementBuffer = [];
         this.lastStepTime = 0;
@@ -92,29 +103,38 @@ class GameState {
         
         // 每秒更新一次卡路里
         if (now - this.lastCalorieUpdateTime >= this.calorieCalculationInterval) {
-            // 基于当前速度和时间间隔计算卡路里
-            // 假设体重为70kg的人，根据MET值计算卡路里消耗
-            // 慢跑 MET ≈ 7, 中速跑 MET ≈ 10, 快速跑 MET ≈ 12.5
-            
-            let met = 0;
-            if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.slow) {
-                met = 7; // 慢跑
-            } else if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.medium) {
-                met = 10; // 中速跑
-            } else {
-                met = 12.5; // 快速跑
+            // 只有当用户正在运动时才计算卡路里消耗
+            if (this.state.currentSpeed > 0) {
+                // 基于当前速度和时间间隔计算卡路里
+                // 根据MET值计算卡路里消耗
+                // 慢跑 MET ≈ 4-5, 中速跑 MET ≈ 7-8, 快速跑 MET ≈ 9-10
+                
+                let met = 0;
+                if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.slow) {
+                    met = 4.5; // 慢跑，降低MET值
+                } else if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.medium) {
+                    met = 7.5; // 中速跑，降低MET值
+                } else {
+                    met = 9.5; // 快速跑，降低MET值
+                }
+                
+                // 卡路里计算公式: 卡路里 = MET * 体重(kg) * 时间(小时)
+                // 使用估算的用户体重，时间转换为小时
+                const weight = this.state.userWeight; // 使用估算的用户体重
+                const timeInHours = (now - this.lastCalorieUpdateTime) / 1000 / 60 / 60;
+                
+                // 计算这段时间内消耗的卡路里
+                const caloriesBurned = met * weight * timeInHours;
+                
+                // 应用调整系数，使卡路里增加更合理（考虑到这是模拟而非真实跑步）
+                const adjustedCalories = caloriesBurned * 0.7;
+                
+                // 累加到总卡路里
+                this.state.caloriesBurned += adjustedCalories;
+                
+                // 确保卡路里显示不超过两位小数
+                this.state.caloriesBurned = parseFloat(this.state.caloriesBurned.toFixed(2));
             }
-            
-            // 卡路里计算公式: 卡路里 = MET * 体重(kg) * 时间(小时)
-            // 假设体重为70kg，时间转换为小时
-            const weight = 70; // kg
-            const timeInHours = (now - this.lastCalorieUpdateTime) / 1000 / 60 / 60;
-            
-            // 计算这段时间内消耗的卡路里
-            const caloriesBurned = met * weight * timeInHours;
-            
-            // 累加到总卡路里
-            this.state.caloriesBurned += caloriesBurned;
             
             // 更新最后计算时间
             this.lastCalorieUpdateTime = now;
@@ -207,6 +227,52 @@ class GameState {
         this.lastArmPhase = this.armPhase;
     }
 
+    // 新增：初始化体重修改功能
+    initWeightModification() {
+        // 等待DOM加载完成
+        document.addEventListener('DOMContentLoaded', () => {
+            // 为体重显示元素添加点击事件
+            const weightElements = ['user-weight-debug', 'weight-bottom', 'weightDisplay'];
+            
+            weightElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.style.cursor = 'pointer'; // 添加指针样式表明可点击
+                    element.title = '点击修改体重'; // 添加提示
+                    
+                    element.addEventListener('click', () => {
+                        this.showWeightDialog();
+                    });
+                }
+            });
+        });
+    }
+    
+    // 显示修改体重的对话框
+    showWeightDialog() {
+        const currentWeight = this.state.userWeight;
+        const newWeight = prompt(`请输入您的体重(kg)，当前体重: ${currentWeight}kg`, currentWeight);
+        
+        // 验证输入
+        if (newWeight !== null) {
+            const weightValue = parseFloat(newWeight);
+            if (!isNaN(weightValue) && weightValue > 0) {
+                this.updateUserWeight(weightValue);
+            } else {
+                alert('请输入有效的体重值');
+            }
+        }
+    }
+
+    // 更新用户体重
+    updateUserWeight(weight) {
+        if (weight && weight > 0) {
+            this.state.userWeight = weight;
+            // 更新显示
+            this.updateDisplay();
+        }
+    }
+
     updateDisplay() {
         try {
             // 更新 FPS
@@ -269,10 +335,53 @@ class GameState {
                 caloriesBottomElement.textContent = this.state.caloriesBurned.toFixed(1);
             }
             
+            // 更新所有体重显示元素
+            const weightElements = {
+                'user-weight-debug': true,  // 调试区域显示
+                'weight-bottom': true,      // 右下角显示
+                'weightDisplay': false      // 其他显示
+            };
+            
+            for (const [id, isSpan] of Object.entries(weightElements)) {
+                const element = document.getElementById(id);
+                if (element) {
+                    if (isSpan) {
+                        element.textContent = this.state.userWeight;
+                    } else {
+                        element.textContent = `Weight: ${this.state.userWeight} kg`;
+                    }
+                }
+            }
+            
             // 更新调试信息
-            document.getElementById('debug').textContent = this.state.debugInfo;
+            const debugElements = ['debug', 'debugInfo'];
+            debugElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = this.state.debugInfo;
+                }
+            });
+            
+            // 更新其他状态显示
+            this.updateMetrics();
         } catch (error) {
             console.error('更新显示错误:', error);
+        }
+    }
+    
+    // 新增：更新其他状态显示
+    updateMetrics() {
+        const metrics = {
+            'speed-bottom': `${this.state.currentSpeed.toFixed(1)} m/s`,
+            'steps-bottom': this.state.stepCount,
+            'calories-bottom': `${this.state.caloriesBurned.toFixed(1)}`
+        };
+        
+        for (const [id, value] of Object.entries(metrics)) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+            }
         }
     }
 

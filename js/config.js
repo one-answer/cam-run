@@ -33,6 +33,27 @@ export const GAME_CONFIG = {
         armMovementWeight: 1.5,       // 近距离模式下手臂运动的权重增加
         shoulderDistanceThreshold: 0.3, // 肩膀距离阈值，用于检测用户是否靠近摄像头
     },
+    
+    // 新增：体重估算参数
+    weightEstimation: {
+        enabled: true,                 // 启用体重估算
+        defaultWeight: 60,             // 默认体重（kg）
+        averageShoulderToHeightRatio: 0.25, // 调整肩宽与身高的比例
+        heightScaleFactor: 550,        // 新增：身高缩放因子
+        averageHeight: {               // 平均身高（cm）
+            male: 170,
+            female: 160
+        },
+        defaultGender: 'male',         // 默认性别
+        averageBMI: {                  // 平均BMI值
+            male: 24,
+            female: 23
+        },
+        shoulderWidthCalibrationFrames: 30,  // 肩宽校准帧数
+        minShoulderDistance: 0.1,      // 最小有效肩膀距离
+        maxShoulderDistance: 0.9,      // 最大有效肩膀距离
+        weightAdjustmentFactor: 0.9    // 体重调整因子
+    },
 
     // 运动评估参数
     motionEvaluation: {

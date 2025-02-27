@@ -1,4 +1,4 @@
-import { renderer } from './renderer.js';
+﻿import { renderer } from './renderer.js';
 import { gameState } from './gameState.js';
 import { GAME_CONFIG } from './config.js';
 
@@ -16,6 +16,9 @@ class PoseDetector {
         this.isProcessing = false;        // 防止并行处理
         this.isCloseUpMode = false;       // 新增：是否处于近距离模式
         this.shoulderDistance = 0;        // 新增：肩膀之间的距离，用于判断用户与摄像头的距离
+        
+        // 用户体重，默认60kg
+        this.userWeight = 60;
     }
 
     async init() {
@@ -96,6 +99,33 @@ class PoseDetector {
 
             // 分析姿势
             this.analyzePose(results);
+            
+            // 更新全局肩膀距离
+            if (results.poseLandmarks[11] && results.poseLandmarks[12]) {
+                const leftShoulder = results.poseLandmarks[11];
+                const rightShoulder = results.poseLandmarks[12];
+                window.currentShoulderDistance = Math.sqrt(
+                    Math.pow(leftShoulder.x - rightShoulder.x, 2) + 
+                    Math.pow(leftShoulder.y - rightShoulder.y, 2)
+                );
+                
+                // 添加调试信息
+                //console.log('肩膀距离:', window.currentShoulderDistance);
+                //console.log('左肩坐标:', leftShoulder.x, leftShoulder.y);
+                //console.log('右肩坐标:', rightShoulder.x, rightShoulder.y);
+                
+                // 检查可见度
+                //console.log('左肩可见度:', leftShoulder.visibility);
+                //console.log('右肩可见度:', rightShoulder.visibility);
+                
+                // 更新调试信息到游戏状态
+                gameState.setState({ 
+                    debugInfo: `肩膀距离: ${window.currentShoulderDistance.toFixed(3)}`
+                });
+            } else {
+                window.currentShoulderDistance = null;
+                //console.log('未检测到肩膀关键点');
+            }
         } catch (error) {
             console.error('处理姿势结果错误:', error);
             gameState.setState({ debugInfo: '处理姿势结果错误' });
