@@ -1,5 +1,32 @@
 // 游戏配置
 export const GAME_CONFIG = {
+    // 移动端优化
+    mobileOptimization: {
+        enabled: true,
+        // 性能优化
+        frameRate: 30,               // 降低移动端帧率
+        bufferSize: 5,              // 减少缓冲区大小
+        // 运动检测优化
+        movementThreshold: 1.8,     // 降低移动端运动检测阈值
+        stepDetectionThreshold: 0.3,// 降低步伐检测阈值
+        // 渲染优化
+        shadowQuality: 0.5,         // 降低阴影质量
+        decorationDensity: 0.7,     // 减少装饰物密度
+        // 新增移动端优化参数
+        adaptiveQuality: true,      // 启用自适应质量
+        memoryLimit: 150,           // 内存使用限制(MB)
+        shadowRenderInterval: 100,  // 阴影渲染间隔(ms)
+        lowEndDeviceDetection: true, // 低端设备检测
+        // 电池优化
+        batterySavingMode: true,    // 电池节省模式
+        inactivityTimeout: 30000,   // 不活动超时时间(ms)
+        // 触摸交互优化
+        touchResponseThreshold: 50, // 触摸响应阈值(ms)
+        gestureMinDistance: 30,     // 最小手势距离(px)
+        // 资源加载优化
+        progressiveLoading: true,   // 渐进式加载
+        textureQuality: 0.7         // 纹理质量(0.0-1.0)
+    },
     // 速度相关
     maxSpeed: 6,              // 提高最大速度上限
     acceleration: 0.08,       // 提高加速度使变化更快
@@ -113,6 +140,28 @@ export const RENDER_CONFIG = {
         near: 120,              // 从80增加到120
         medium: 180,            // 从120增加到180
         far: 240                // 从160增加到240
+    },
+    // 移动端特定渲染设置
+    mobile: {
+        shadowMapSize: 512,     // 移动端降低阴影贴图大小
+        maxFPS: 30,             // 移动端最大FPS
+        maxDecorations: 200,    // 移动端减少装饰物数量
+        textureQuality: 0.7,    // 纹理质量降低
+        lodDistances: {         // 移动端LOD距离缩短
+            near: 80,
+            medium: 120,
+            far: 160
+        },
+        shadowEnabled: true,    // 是否启用阴影
+        effectsEnabled: false,  // 禁用特效
+        antialiasing: false,    // 禁用抗锯齿
+        postProcessing: false,  // 禁用后处理
+        // 电池优化
+        batterySaving: {
+            enabled: true,
+            inactiveMaxFPS: 10, // 不活动时的最大FPS
+            lowBatteryMaxFPS: 20 // 低电量时的最大FPS
+        }
     }
 };
 

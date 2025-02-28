@@ -2,11 +2,15 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <meta name="battery-savings" content="allow">
     <title>Webcam Runner</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4.1633558788/pose.js" crossorigin="anonymous"></script>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4.1633558788/pose.js" crossorigin="anonymous" defer></script>
     <style>
         body {
             margin: 0;
@@ -129,6 +133,56 @@
             padding: 3px 8px;
             border-radius: 4px;
             font-weight: bold;
+        }
+        
+        /* 移动端优化 */
+        @media screen and (max-width: 768px) {
+            /* 竖屏样式 */
+            @media (orientation: portrait) {
+                #metrics-display {
+                    font-size: 12px;
+                    padding: 5px;
+                    width: 90%;
+                    left: 5%;
+                    right: 5%;
+                    bottom: 10px;
+                }
+            }
+            /* 横屏样式 */
+            @media (orientation: landscape) {
+                #metrics-display {
+                    font-size: 14px;
+                    padding: 8px;
+                    width: 40%;
+                    right: 10px;
+                    bottom: 10px;
+                    left: auto;
+                }
+            }
+            #gameStatus {
+                font-size: 12px;
+                padding: 5px;
+                width: 90%;
+                left: 5%;
+                right: 5%;
+                top: 10px;
+            }
+            #instructions {
+                font-size: 12px;
+                padding: 5px;
+                width: 90%;
+                left: 5%;
+                right: 5%;
+                top: 10px;
+            }
+            #gameState {
+                font-size: 12px;
+                padding: 5px;
+                width: 90%;
+                left: 5%;
+                right: 5%;
+                top: 20px;
+            }
         }
     </style>
 </head>

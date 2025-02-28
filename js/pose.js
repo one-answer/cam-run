@@ -1,6 +1,7 @@
-import { renderer } from './renderer.js';
 import { gameState } from './gameState.js';
-import { GAME_CONFIG } from './config.js';
+import { GAME_CONFIG, RENDER_CONFIG } from './config.js';
+import { renderer } from './renderer.js';
+import { shadowRenderer } from './shadowRenderer.js';
 
 class PoseDetector {
     constructor() {
@@ -359,6 +360,25 @@ class PoseDetector {
         }
         
         const isRunning = smoothedScore > GAME_CONFIG.runningThreshold;
+        
+        // 当检测到运动时，更新活动时间戳，防止错误地进入不活动状态
+        if (smoothedScore > 0.1) { // 只要有一定程度的运动就更新活动时间
+            renderer.lastActivityTime = performance.now();
+            
+            // 如果当前处于不活动状态，则恢复正常模式
+            if (renderer.isInactive) {
+                renderer.isInactive = false;
+                console.log('检测到运动，恢复正常模式');
+                
+                // 恢复阴影渲染频率
+                shadowRenderer.renderInterval = renderer.isMobile ? 100 : 50;
+                
+                // 恢复FPS上限
+                if (RENDER_CONFIG && RENDER_CONFIG.mobile) {
+                    RENDER_CONFIG.mobile.maxFPS = 30;
+                }
+            }
+        }
         
         // 不在这里更新debugInfo，避免与onPoseResults中的信息冲突
         // 只更新运动相关的状态

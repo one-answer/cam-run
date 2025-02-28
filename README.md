@@ -1,55 +1,54 @@
+[中文说明](README.cn.md)
 # Webcam Runner
 
-一个基于网络摄像头的跑步游戏，通过检测用户的动作来控制游戏角色在无限场景中奔跑。主要技术：Three.js，MediaPipe Pose
+A running game based on webcam, controlling the game character in an infinite scene by detecting user movements. Main technologies: Three.js, MediaPipe Pose
 
-## 技术架构
+## Technical Architecture
 
-### 核心框架
-- **Three.js**: 用于3D场景渲染
-  - 实现无限地形生成
-  - 处理场景物体
-  - 管理相机动画
-- **MediaPipe Pose**: 用于动作检测
-  - 支持全身/半身动作识别
-  - 实时姿势估计（约20fps）
-  - 关键点追踪
-  - 用户距离检测（支持近距离模式）
-  - 动作力度计算（基于用户体重）
+### Core Frameworks
+- **Three.js**: For 3D scene rendering
+  - Infinite terrain generation
+  - Scene object handling
+  - Camera animation management
+- **MediaPipe Pose**: For motion detection
+  - Supports full-body/half-body recognition
+  - Real-time pose estimation 
+  - Keypoint tracking
+  - User distance detection (supports close-range mode)
+  - Movement intensity calculation (based on user weight)
 
-## 功能特性
+## Features
 
-### 现有功能
-1. 基础3D场景
-   - 无限地形生成
-   - 基本场景物体
-   - 动态相机系统
+### Current Features
+1. Basic 3D Scene
+   - Infinite terrain generation
+   - Basic scene objects
+   - Dynamic camera system
 
-2. 动作检测系统
-   - 支持全身/半身检测
-   - 实时动作分析（约20fps）
-   - 智能运动判定
-   - 用户距离检测（支持近距离模式）
-   - 动作力度计算（基于用户体重）
+2. Motion Detection System
+   - Supports full-body/half-body detection
+   - Real-time motion analysis
+   - Intelligent movement judgment
+   - User distance detection (supports close-range mode)
+   - Movement intensity calculation (based on user weight)
 
-## 系统要求
-- 处理器：Intel i3 或同等性能的处理器（建议支持 AVX 指令集）
-- 网络摄像头：支持 720p 分辨率的摄像头
-- 浏览器：Chrome 或 Edge 最新版本（建议使用 Chrome，因为 MediaPipe 在 Chrome 上的性能最佳）
-- 内存：4GB RAM+
-- 显卡：支持 WebGL 2.0 的显卡（如 Intel HD Graphics 4000 或更高）
+## System Requirements
+- Processor: Intel i3 or equivalent (recommended with AVX instruction set)
+- Webcam: Supports 720p resolution
+- Browser: Latest version of Chrome or Edge (Chrome recommended for best MediaPipe performance)
+- Memory: 4GB RAM+
+- Graphics: Supports WebGL 2.0 (e.g., Intel HD Graphics 4000 or higher)
 
-## 安装和运行
-1. 克隆项目
-2. 在浏览器中打开index.html
-3. 允许摄像头访问权限
+## Installation and Running
+1. Clone the project
+2. Open index.html in the browser
+3. Allow camera access
 
-
-## 许可证
+## License
 MIT License
 
-## 打赏
-如果你觉得好，可以为我买杯咖啡：
-
+## Donate
+If you find this project useful, you can buy me a coffee:
 
 [![paypal](https://github.com/Ximi1970/Donate/blob/master/paypal_btn_donateCC_LG_1.gif)](https://paypal.me/jameszhai78)
 
