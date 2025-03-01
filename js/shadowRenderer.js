@@ -16,7 +16,7 @@ class ShadowRenderer {
         this.tempLowQuality = false;
         this.previousQuality = this.isMobile ? 0 : 2;
         this.adaptiveQualityEnabled = true;
-        this.memoryCheckInterval = 20000; // 增加到20秒检查一次内存
+        this.memoryCheckInterval = 30000; // 增加到30秒检查一次内存
         this.lastMemoryCheck = 0;
         this.devicePerformanceScore = 0; // 设备性能评分
         this.frameTimeHistory = []; // 用于存储帧时间历史
@@ -33,13 +33,23 @@ class ShadowRenderer {
         this.qualityChangeThreshold = 5; // 需要连续5次检测才会改变质量
         this.lastQualityChangeTime = 0;
         this.qualityChangeCooldown = 10000; // 10秒冷却时间
+        
+        // 新增分辨率缩放参数
+        this.minScale = this.isMobile ? 0.3 : 0.5;
+        this.maxScale = this.isMobile ? 0.7 : 1.0;
+        this.currentScale = this.isMobile ? 0.5 : 0.75;
+        this.scaleStep = 0.1;
 
-        // 新增：移动端增强阴影配置
-        this.mobileShadowEnhanced = true; // 默认启用移动端增强阴影
-        this.mobileShadowDetail = 1; // 移动端阴影细节级别 (0-低, 1-中, 2-高)
-        this.shadowShapeSmoothing = true; // 启用阴影形状平滑
-        this.shadowColorVariation = this.isMobile ? 0.1 : 0.2; // 阴影颜色变化
-        this.shadowGroundEffect = this.isMobile; // 启用地面效果
+        // 增强性能评分系统
+        this.performanceScoreThresholds = {
+            low: 15,    // fps
+            medium: 25, // fps
+            high: 40    // fps
+        };
+
+        // 优化内存检查间隔
+        this.memoryUsageHistory = [];
+        this.maxMemoryHistoryLength = 10;
     }
 
     init() {
@@ -53,10 +63,13 @@ class ShadowRenderer {
         }
         this.ctx = this.canvas.getContext('2d');
         
-        // 移动设备使用更低的分辨率
-        const scale = this.isMobile ? 0.5 : 0.75;
-        this.canvas.width = 240 * scale; // 降低分辨率
-        this.canvas.height = 180 * scale;
+        // 动态设置初始分辨率
+        const initialScale = Math.min(
+            this.maxScale, 
+            Math.max(this.minScale, this.currentScale)
+        );
+        this.canvas.width = 240 * initialScale;
+        this.canvas.height = 180 * initialScale;
 
         // 离屏画布
         this.offscreenCanvas = document.createElement('canvas');
@@ -75,58 +88,70 @@ class ShadowRenderer {
         // 如果已经完成性能测试，不再重复测试
         if (this.performanceTestCompleted) return;
         
-        // 计算平均帧时间
-        let totalFrameTime = 0;
-        for (const frameTime of this.frameTimeHistory) {
-            totalFrameTime += frameTime;
+        // 电脑端默认使用高质量设置，除非明显性能不足
+        if (!this.isMobile) {
+            // 分析帧时间历史
+            if (this.frameTimeHistory.length < 15) return; // 至少需要15帧数据
+            
+            // 排除异常值，取中间80%的数据计算平均值
+            const sortedFrameTimes = [...this.frameTimeHistory].sort((a, b) => a - b);
+            const startIndex = Math.floor(sortedFrameTimes.length * 0.1);
+            const endIndex = Math.floor(sortedFrameTimes.length * 0.9);
+            const filteredFrameTimes = sortedFrameTimes.slice(startIndex, endIndex);
+            
+            const avgFrameTime = filteredFrameTimes.reduce((a, b) => a + b, 0) / filteredFrameTimes.length;
+            const fps = 1000 / avgFrameTime;
+            
+            console.log(`初始性能检测 - 电脑端FPS: ${fps.toFixed(1)}`);
+            
+            // 电脑端性能阈值提高到12fps，使其不会轻易降低质量
+            // 只有在性能极差的情况下才降低质量
+            if (fps < 12) { // 如果帧率低于12fps，降低质量
+                this.devicePerformanceScore = 1;
+                this.renderInterval = 80; // 约12.5fps
+                this.SHADOW_QUALITY = 1;
+                console.log('电脑性能不足，使用中等质量阴影');
+            } else { // 电脑性能正常，使用高质量
+                this.devicePerformanceScore = 3;
+                this.renderInterval = 50; // 20fps
+                this.SHADOW_QUALITY = 2;
+                console.log('电脑性能良好，使用高质量阴影');
+            }
+            
+            this.performanceTestCompleted = true;
+            this.lastQualityChangeTime = performance.now(); // 设置初始质量变化时间
+            return;
         }
-        const avgFrameTime = totalFrameTime / this.frameTimeHistory.length;
         
-        // 根据平均帧时间评估设备性能
-        // 帧时间越短，设备性能越好
-        if (avgFrameTime < 10) { // 非常好的性能
-            this.devicePerformanceScore = 3;
-        } else if (avgFrameTime < 16) { // 良好的性能
-            this.devicePerformanceScore = 2;
-        } else if (avgFrameTime < 30) { // 一般性能
-            this.devicePerformanceScore = 1;
-        } else { // 较差的性能
+        // 移动设备性能检测
+        // 分析帧时间历史
+        if (this.frameTimeHistory.length < 15) return; // 至少需要15帧数据
+        
+        // 排除异常值，取中间80%的数据计算平均值
+        const sortedFrameTimes = [...this.frameTimeHistory].sort((a, b) => a - b);
+        const startIndex = Math.floor(sortedFrameTimes.length * 0.1);
+        const endIndex = Math.floor(sortedFrameTimes.length * 0.9);
+        const filteredFrameTimes = sortedFrameTimes.slice(startIndex, endIndex);
+        
+        const avgFrameTime = filteredFrameTimes.reduce((a, b) => a + b, 0) / filteredFrameTimes.length;
+        const fps = 1000 / avgFrameTime;
+        
+        // 根据帧率评估设备性能
+        if (fps < 15) { // 性能很差
             this.devicePerformanceScore = 0;
-        }
-        
-        console.log(`设备性能评分: ${this.devicePerformanceScore}，平均帧时间: ${avgFrameTime.toFixed(2)}ms`);
-        
-        // 根据性能评分调整阴影质量
-        if (this.isMobile) {
-            if (this.devicePerformanceScore >= 2) {
-                // 高性能移动设备 - 启用增强阴影
-                this.SHADOW_QUALITY = 0; // 仍然使用简化阴影
-                this.mobileShadowEnhanced = true;
-                this.mobileShadowDetail = 1; // 中等细节
-                this.shadowGroundEffect = true;
-                this.renderInterval = 80; // 提高渲染频率
-            } else if (this.devicePerformanceScore >= 1) {
-                // 中等性能移动设备 - 简化的增强阴影
-                this.SHADOW_QUALITY = 0;
-                this.mobileShadowEnhanced = true;
-                this.mobileShadowDetail = 0; // 低细节
-                this.shadowGroundEffect = false;
-                this.renderInterval = 100; // 保持默认渲染频率
-            } else {
-                // 低性能移动设备 - 禁用增强阴影
-                this.SHADOW_QUALITY = 0;
-                this.mobileShadowEnhanced = false;
-                this.renderInterval = 120; // 降低渲染频率
-            }
-        } else {
-            // 桌面设备根据性能调整阴影质量
-            if (this.devicePerformanceScore >= 2) {
-                this.SHADOW_QUALITY = 2; // 高质量
-            } else if (this.devicePerformanceScore >= 1) {
-                this.SHADOW_QUALITY = 1; // 中等质量
-            } else {
-                this.SHADOW_QUALITY = 0; // 低质量
-            }
+            this.renderInterval = 200; // 5fps
+            this.SHADOW_QUALITY = 0;
+            console.log('设备性能较差，使用最低质量设置');
+        } else if (fps < 25) { // 性能一般
+            this.devicePerformanceScore = 1;
+            this.renderInterval = 100; // 10fps
+            this.SHADOW_QUALITY = 0;
+            console.log('设备性能一般，使用低质量设置');
+        } else { // 性能良好
+            this.devicePerformanceScore = 2;
+            this.renderInterval = 80; // 约12.5fps
+            this.SHADOW_QUALITY = 1;
+            console.log('设备性能良好，使用中等质量设置');
         }
         
         this.performanceTestCompleted = true;
@@ -293,13 +318,6 @@ class ShadowRenderer {
                         
                         // 电脑端降低到中等质量，移动端降低到最低质量
                         this.SHADOW_QUALITY = this.isMobile ? 0 : 1;
-                        
-                        // 如果是移动端，也禁用增强阴影功能
-                        if (this.isMobile) {
-                            this.mobileShadowDetail = 0;
-                            this.shadowGroundEffect = false;
-                        }
-                        
                         this.lastQualityChangeTime = now;
                         this.qualityChangeCounter = 0;
                         console.log(`内存使用过高 (${memoryUsage.toFixed(2)}MB)，临时降低阴影质量`);
@@ -313,13 +331,6 @@ class ShadowRenderer {
                     if (this.qualityChangeCounter >= this.qualityChangeThreshold) {
                         this.SHADOW_QUALITY = this.previousQuality;
                         this.tempLowQuality = false;
-                        
-                        // 如果是移动端，恢复增强阴影功能
-                        if (this.isMobile) {
-                            this.mobileShadowDetail = 1;
-                            this.shadowGroundEffect = true;
-                        }
-                        
                         this.lastQualityChangeTime = now;
                         this.qualityChangeCounter = 0;
                         console.log(`内存使用恢复正常 (${memoryUsage.toFixed(2)}MB)，恢复阴影质量`);
@@ -402,63 +413,15 @@ class ShadowRenderer {
         const centerX = (minX + maxX) / 2 * this.offscreenCanvas.width;
         const centerY = (minY + maxY) / 2 * this.offscreenCanvas.height;
         
-        // 计算阴影尺寸 - 根据人物高度和宽度调整
+        // 减小阴影尺寸
         const width = (maxX - minX) * this.offscreenCanvas.width * 0.15;
         const height = (maxY - minY) * this.offscreenCanvas.height * 0.1;
         
-        // 清除画布
-        this.offscreenCtx.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
-        
-        // 如果启用了移动端增强阴影并且是移动设备
-        if (this.isMobile && this.mobileShadowEnhanced) {
-            // 获取脚部位置以更好地定位阴影
-            const leftFoot = landmarks[31];
-            const rightFoot = landmarks[32];
-            let footY = centerY;
-            
-            // 如果有脚部关键点，使用它们来定位阴影
-            if (leftFoot && rightFoot) {
-                footY = Math.max(leftFoot.y, rightFoot.y) * this.offscreenCanvas.height;
-            }
-            
-            // 根据细节级别绘制不同质量的阴影
-            if (this.mobileShadowDetail >= 1) {
-                // 中等细节 - 椭圆阴影带渐变
-                const gradient = this.offscreenCtx.createRadialGradient(
-                    centerX, footY, 0,
-                    centerX, footY, width * 1.5
-                );
-                gradient.addColorStop(0, `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`);
-                gradient.addColorStop(0.7, `rgba(0, 0, 0, ${this.SHADOW_OPACITY * 0.7})`);
-                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-                
-                // 绘制椭圆阴影
-                this.offscreenCtx.beginPath();
-                this.offscreenCtx.ellipse(centerX, footY, width * 1.2, height * 1.5, 0, 0, Math.PI * 2);
-                this.offscreenCtx.fillStyle = gradient;
-                this.offscreenCtx.fill();
-                
-                // 如果启用了地面效果，添加一个扁平的椭圆作为地面反射
-                if (this.shadowGroundEffect) {
-                    this.offscreenCtx.beginPath();
-                    this.offscreenCtx.ellipse(centerX, footY + height * 0.2, width * 1.5, height * 0.8, 0, 0, Math.PI * 2);
-                    this.offscreenCtx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY * 0.3})`;
-                    this.offscreenCtx.fill();
-                }
-            } else {
-                // 低细节 - 简单椭圆
-                this.offscreenCtx.beginPath();
-                this.offscreenCtx.ellipse(centerX, footY, width * 1.2, height, 0, 0, Math.PI * 2);
-                this.offscreenCtx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
-                this.offscreenCtx.fill();
-            }
-        } else {
-            // 原始的超简化阴影
-            this.offscreenCtx.beginPath();
-            this.offscreenCtx.ellipse(centerX, centerY + height * 0.5, width, height, 0, 0, Math.PI * 2);
-            this.offscreenCtx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
-            this.offscreenCtx.fill();
-        }
+        // 绘制椭圆阴影
+        this.offscreenCtx.beginPath();
+        this.offscreenCtx.ellipse(centerX, centerY + height * 0.5, width, height, 0, 0, Math.PI * 2);
+        this.offscreenCtx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
+        this.offscreenCtx.fill();
         
         // 将离屏画布内容绘制到主画布
         this.ctx.save();
@@ -682,6 +645,23 @@ class ShadowRenderer {
         ctx.arc(centerX, centerY, headRadius, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
+    }
+
+    // 新增分辨率调整方法
+    adjustResolution() {
+        const targetScale = Math.min(
+            this.maxScale,
+            Math.max(this.minScale, this.currentScale)
+        );
+        
+        if (Math.abs(this.currentScale - targetScale) > this.scaleStep) {
+            this.currentScale = targetScale;
+            this.canvas.width = 240 * this.currentScale;
+            this.canvas.height = 180 * this.currentScale;
+            this.offscreenCanvas.width = this.canvas.width;
+            this.offscreenCanvas.height = this.canvas.height;
+            console.log(`调整阴影分辨率至: ${(this.currentScale * 100).toFixed(0)}%`);
+        }
     }
 }
 
