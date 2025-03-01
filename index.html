@@ -143,10 +143,13 @@
                 #metrics-display {
                     font-size: 12px;
                     padding: 5px;
-                    width: 90%;
-                    left: 5%;
-                    right: 5%;
-                    bottom: 40px;
+                    width: auto;
+                    right: 10px;
+                    bottom: 10px;
+                    left: auto;
+                }
+                #metrics-display div {
+                    margin-top: 3px;
                 }
             }
             /* 横屏样式 */
@@ -192,7 +195,7 @@
     <video id="webcamView" playsinline></video>
     <canvas id="skeletonCanvas"></canvas>
     <canvas id="shadowCanvas"></canvas>
-    <div id="gameStatus" style="display:none">
+    <div id="gameStatus" >
         游戏状态 (FPS: <span id="fps">0</span>)<br>
         动作质量: <span id="quality">0.0%</span><br>
         <span id="speed">当前速度: 0.0 m/s </span><br>

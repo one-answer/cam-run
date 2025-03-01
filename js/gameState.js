@@ -371,8 +371,26 @@ class GameState {
     
     // 新增：更新其他状态显示
     updateMetrics() {
+        // 确定速度级别和对应的样式类
+        let speedClass = '';
+        const speedValue = this.state.currentSpeed.toFixed(1);
+        const speedText = `${speedValue} m/s`;
+        
+        if (this.state.currentSpeed > 0) {
+            // 确定速度级别和对应的样式类
+            if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.slow) {
+                speedClass = 'speed-slow';
+            } else if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.medium) {
+                speedClass = 'speed-medium';
+            } else {
+                speedClass = 'speed-fast';
+            }
+        }
+        
         const metrics = {
-            'speed-bottom': `${this.state.currentSpeed.toFixed(1)} m/s`,
+            'speed-bottom': this.state.currentSpeed === 0 ? 
+                speedText : 
+                `<span class="${speedClass}">${speedText}</span>`,
             'steps-bottom': this.state.stepCount,
             'calories-bottom': `${this.state.caloriesBurned.toFixed(1)}`
         };
@@ -380,7 +398,7 @@ class GameState {
         for (const [id, value] of Object.entries(metrics)) {
             const element = document.getElementById(id);
             if (element) {
-                element.textContent = value;
+                element.innerHTML = value;
             }
         }
     }

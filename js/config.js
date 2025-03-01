@@ -17,8 +17,7 @@ export const GAME_CONFIG = {
         memoryLimit: 150,           // 内存使用限制(MB)
         shadowRenderInterval: 100,  // 阴影渲染间隔(ms)
         lowEndDeviceDetection: true, // 低端设备检测
-        // 电池优化
-        batterySavingMode: true,    // 电池节省模式
+        // 不活动检测
         inactivityTimeout: 30000,   // 不活动超时时间(ms)
         // 触摸交互优化
         touchResponseThreshold: 50, // 触摸响应阈值(ms)
@@ -155,13 +154,7 @@ export const RENDER_CONFIG = {
         shadowEnabled: true,    // 是否启用阴影
         effectsEnabled: false,  // 禁用特效
         antialiasing: false,    // 禁用抗锯齿
-        postProcessing: false,  // 禁用后处理
-        // 电池优化
-        batterySaving: {
-            enabled: true,
-            inactiveMaxFPS: 10, // 不活动时的最大FPS
-            lowBatteryMaxFPS: 20 // 低电量时的最大FPS
-        }
+        postProcessing: false   // 禁用后处理
     }
 };
 

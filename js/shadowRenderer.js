@@ -11,8 +11,7 @@ class ShadowRenderer {
         this.lastRenderTime = 0;
         this.renderInterval = this.isMobile ? 100 : 50; // 移动端10fps, 桌面端20fps
         this.lowQualityMode = this.isMobile;
-        // 设置默认质量 - 电脑端默认使用高质量(2)，移动端使用低质量(0)
-        this.SHADOW_QUALITY = this.isMobile ? 0 : 2;
+        this.SHADOW_QUALITY = 2;
         this.tempLowQuality = false;
         this.previousQuality = this.isMobile ? 0 : 2;
         this.adaptiveQualityEnabled = true;
@@ -88,44 +87,8 @@ class ShadowRenderer {
         // 如果已经完成性能测试，不再重复测试
         if (this.performanceTestCompleted) return;
         
-        // 电脑端默认使用高质量设置，除非明显性能不足
-        if (!this.isMobile) {
-            // 分析帧时间历史
-            if (this.frameTimeHistory.length < 15) return; // 至少需要15帧数据
-            
-            // 排除异常值，取中间80%的数据计算平均值
-            const sortedFrameTimes = [...this.frameTimeHistory].sort((a, b) => a - b);
-            const startIndex = Math.floor(sortedFrameTimes.length * 0.1);
-            const endIndex = Math.floor(sortedFrameTimes.length * 0.9);
-            const filteredFrameTimes = sortedFrameTimes.slice(startIndex, endIndex);
-            
-            const avgFrameTime = filteredFrameTimes.reduce((a, b) => a + b, 0) / filteredFrameTimes.length;
-            const fps = 1000 / avgFrameTime;
-            
-            console.log(`初始性能检测 - 电脑端FPS: ${fps.toFixed(1)}`);
-            
-            // 电脑端性能阈值提高到12fps，使其不会轻易降低质量
-            // 只有在性能极差的情况下才降低质量
-            if (fps < 12) { // 如果帧率低于12fps，降低质量
-                this.devicePerformanceScore = 1;
-                this.renderInterval = 80; // 约12.5fps
-                this.SHADOW_QUALITY = 1;
-                console.log('电脑性能不足，使用中等质量阴影');
-            } else { // 电脑性能正常，使用高质量
-                this.devicePerformanceScore = 3;
-                this.renderInterval = 50; // 20fps
-                this.SHADOW_QUALITY = 2;
-                console.log('电脑性能良好，使用高质量阴影');
-            }
-            
-            this.performanceTestCompleted = true;
-            this.lastQualityChangeTime = performance.now(); // 设置初始质量变化时间
-            return;
-        }
-        
-        // 移动设备性能检测
         // 分析帧时间历史
-        if (this.frameTimeHistory.length < 15) return; // 至少需要15帧数据
+        if (this.frameTimeHistory.length < 30) return; // 至少需要30帧数据
         
         // 排除异常值，取中间80%的数据计算平均值
         const sortedFrameTimes = [...this.frameTimeHistory].sort((a, b) => a - b);
@@ -133,29 +96,46 @@ class ShadowRenderer {
         const endIndex = Math.floor(sortedFrameTimes.length * 0.9);
         const filteredFrameTimes = sortedFrameTimes.slice(startIndex, endIndex);
         
+        // 计算平均帧时间和FPS
         const avgFrameTime = filteredFrameTimes.reduce((a, b) => a + b, 0) / filteredFrameTimes.length;
-        const fps = 1000 / avgFrameTime;
+        const avgFps = 1000 / avgFrameTime;
         
-        // 根据帧率评估设备性能
-        if (fps < 15) { // 性能很差
+        // 计算FPS标准差
+        const fpsValues = filteredFrameTimes.map(t => 1000 / t);
+        const mean = fpsValues.reduce((a, b) => a + b, 0) / fpsValues.length;
+        const variance = fpsValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / fpsValues.length;
+        const stdDev = Math.sqrt(variance);
+        
+        // 如果FPS波动太大（标准差 > 5），认为FPS不稳定，等待更多数据
+        if (stdDev > 5) {
+            console.log(`FPS不稳定 (标准差: ${stdDev.toFixed(1)}), 等待更多数据`);
+            return;
+        }
+        
+        console.log(`性能检测 - 平均FPS: ${avgFps.toFixed(1)}, 标准差: ${stdDev.toFixed(1)}`);
+        
+        // 默认使用高质量
+        this.SHADOW_QUALITY = 2;
+        
+        // 根据 FPS 动态调整渲染间隔
+        if (avgFps < 5) { // 性能很差
             this.devicePerformanceScore = 0;
             this.renderInterval = 200; // 5fps
-            this.SHADOW_QUALITY = 0;
-            console.log('设备性能较差，使用最低质量设置');
-        } else if (fps < 25) { // 性能一般
+            this.SHADOW_QUALITY = 0; // 降低质量
+            console.log('性能较差，降低渲染频率');
+        } else if (avgFps < 10) { // 性能一般
             this.devicePerformanceScore = 1;
             this.renderInterval = 100; // 10fps
-            this.SHADOW_QUALITY = 0;
-            console.log('设备性能一般，使用低质量设置');
+            this.SHADOW_QUALITY = 1;
+            console.log('性能一般，使用中等质量');
         } else { // 性能良好
             this.devicePerformanceScore = 2;
-            this.renderInterval = 80; // 约12.5fps
-            this.SHADOW_QUALITY = 1;
-            console.log('设备性能良好，使用中等质量设置');
+            this.renderInterval = 50; // 20fps
+            console.log('性能良好，保持高质量');
         }
         
         this.performanceTestCompleted = true;
-        this.lastQualityChangeTime = performance.now(); // 设置初始质量变化时间
+        this.lastQualityChangeTime = performance.now();
     }
 
     clear() {
@@ -284,11 +264,11 @@ class ShadowRenderer {
                 break;
             default:
                 // 电脑端默认使用高质量
-                if (!this.isMobile) {
+                // if (!this.isMobile) {
                     this.renderFullShadow(landmarks);
-                } else {
-                    this.renderSimplifiedShadow(landmarks);
-                }
+                // } else {
+                //     this.renderSimplifiedShadow(landmarks);
+                // }
         }
         
         // 内存使用检查 - 每隔一段时间检查一次
@@ -351,48 +331,6 @@ class ShadowRenderer {
         }
     }
     
-    // 基于性能自适应调整质量
-    adaptQualityBasedOnPerformance() {
-        if (!this.frameTimeHistory.length) return;
-        
-        // 计算平均帧时间
-        const avgFrameTime = this.frameTimeHistory.reduce((sum, time) => sum + time, 0) / this.frameTimeHistory.length;
-        
-        // 获取内存使用情况
-        let memoryUsage = 0;
-        if (window.performance && window.performance.memory) {
-            memoryUsage = window.performance.memory.usedJSHeapSize / (1024 * 1024); // MB
-        }
-        
-        // 基于性能调整质量
-        if (avgFrameTime > 16 || memoryUsage > this.highMemoryThreshold) { // 帧时间超过16ms(约60fps)或内存超过200MB
-            if (this.SHADOW_QUALITY > 0 && this.qualityChangeCounter < this.qualityChangeThreshold) {
-                this.qualityChangeCounter++;
-                if (this.qualityChangeCounter >= this.qualityChangeThreshold && performance.now() - this.lastQualityChangeTime > this.qualityChangeCooldown) {
-                    this.SHADOW_QUALITY--;
-                    this.lastQualityChangeTime = performance.now();
-                    console.log(`性能不佳，降低阴影质量到${this.SHADOW_QUALITY}`);
-                    // 重置历史记录以便评估新设置
-                    this.frameTimeHistory = [];
-                    this.qualityChangeCounter = 0;
-                }
-            }
-        } else if (avgFrameTime < 8 && memoryUsage < this.lowMemoryThreshold && this.SHADOW_QUALITY < 2) {
-            // 性能良好，可以考虑提高质量
-            if (Math.random() < 0.3 && this.qualityChangeCounter < this.qualityChangeThreshold) { // 30%的概率提高质量，避免频繁切换
-                this.qualityChangeCounter++;
-                if (this.qualityChangeCounter >= this.qualityChangeThreshold && performance.now() - this.lastQualityChangeTime > this.qualityChangeCooldown) {
-                    this.SHADOW_QUALITY++;
-                    this.lastQualityChangeTime = performance.now();
-                    console.log(`性能良好，提高阴影质量到${this.SHADOW_QUALITY}`);
-                    // 重置历史记录以便评估新设置
-                    this.frameTimeHistory = [];
-                    this.qualityChangeCounter = 0;
-                }
-            }
-        }
-    }
-    
     // 超简化的阴影绘制 - 用于最低质量模式
     renderUltraSimpleShadow(landmarks) {
         // 找到关键点的边界
@@ -431,50 +369,22 @@ class ShadowRenderer {
     }
 
     renderSimplifiedShadow(landmarks) {
-        // 清除画布
-        this.offscreenCtx.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
+        if (!landmarks || landmarks.length < 33) return;
         
-        // 找到关键点的边界
-        let minX = 1, maxX = 0, minY = 1, maxY = 0;
+        // 增加中等质量下的阴影透明度
+        this.offscreenCtx.globalAlpha = this.isMobile ? 0.6 : 0.8;
         
-        for (const lm of landmarks) {
-            if (!lm) continue;
-            minX = Math.min(minX, lm.x);
-            maxX = Math.max(maxX, lm.x);
-            minY = Math.min(minY, lm.y);
-            maxY = Math.max(maxY, lm.y);
-        }
+        // 调整阴影模糊半径
+        this.offscreenCtx.shadowBlur = this.isMobile ? 8 : 12;
+        this.offscreenCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
         
-        // 如果没有足够的关键点，返回
-        if (minX === 1 || maxX === 0 || minY === 1 || maxY === 0) return;
-        
-        // 计算中心点和尺寸
-        const centerX = (minX + maxX) / 2 * this.offscreenCanvas.width;
-        const centerY = (maxY - (maxY - minY) * 0.1) * this.offscreenCanvas.height; // 向下偏移一点
-        
-        // 减小阴影尺寸
-        const width = (maxX - minX) * this.offscreenCanvas.width * 1.0;
-        const height = (maxY - minY) * this.offscreenCanvas.height * 0.6;
-        
-        // 创建径向渐变
-        const gradient = this.offscreenCtx.createRadialGradient(
-            centerX, centerY, 0,
-            centerX, centerY, width
-        );
-        gradient.addColorStop(0, `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`);
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        
-        // 绘制椭圆阴影
-        this.offscreenCtx.beginPath();
-        this.offscreenCtx.ellipse(centerX, centerY, width, height, 0, 0, Math.PI * 2);
-        this.offscreenCtx.fillStyle = gradient;
-        this.offscreenCtx.fill();
+        // 绘制简化轮廓
+        this.drawTorso(this.offscreenCtx, landmarks);
+        this.drawLimbs(this.offscreenCtx, landmarks);
+        this.drawHead(this.offscreenCtx, landmarks);
         
         // 将离屏画布内容绘制到主画布
-        this.ctx.save();
-        this.ctx.globalAlpha = 0.5;
         this.ctx.drawImage(this.offscreenCanvas, 0, 0);
-        this.ctx.restore();
     }
 
     renderFullShadow(landmarks) {

@@ -23,14 +23,6 @@ class Renderer {
         this.lastMemoryCheck = 0;
         this.debugElement = null;
         
-        // 电池状态监控
-        this.batteryLevel = 1.0; // 默认满电
-        this.isCharging = true;  // 默认充电中
-        this.lowBatteryMode = false;
-        this.batteryCheckInterval = 60000; // 每分钟检查一次电池
-        this.lastBatteryCheck = 0;
-        this.initBatteryMonitoring();
-        
         // 不活动检测
         this.lastActivityTime = performance.now();
         this.isInactive = false;
@@ -238,12 +230,9 @@ class Renderer {
         // 检查不活动状态
         this.checkInactivity(now);
         
-        // 检查电池状态
-        this.checkBatteryStatus();
-        
         // 更新调试信息
         if (this.debugElement) {
-            this.debugElement.textContent = `FPS: ${this.fps} | 内存: ${Math.round(this.memory)}MB | 电池: ${Math.round(this.batteryLevel * 100)}% ${this.isCharging ? '(充电中)' : ''} | ${this.isInactive ? '不活动' : '活动中'} | 阴影质量: ${shadowRenderer ? shadowRenderer.SHADOW_QUALITY : 'N/A'}`;
+            this.debugElement.textContent = `FPS: ${this.fps} | 内存: ${Math.round(this.memory)}MB | ${this.isInactive ? '不活动' : '活动中'} | 阴影质量: ${shadowRenderer ? shadowRenderer.SHADOW_QUALITY : 'N/A'}`;
         }
     }
 
@@ -284,58 +273,6 @@ class Renderer {
         this.updatePerformanceMetrics();
     }
 
-    initBatteryMonitoring() {
-        // 只在移动设备上监控电池
-        if (!this.isMobile) return;
-        
-        // 检查浏览器是否支持电池API
-        if (navigator.getBattery) {
-            try {
-                navigator.getBattery().then(battery => {
-                    this.batteryLevel = battery.level;
-                    this.isCharging = battery.charging;
-                    this.checkBatteryStatus();
-                    
-                    // 添加事件监听器
-                    battery.addEventListener('levelchange', () => {
-                        this.batteryLevel = battery.level;
-                        this.isCharging = battery.charging;
-                        this.checkBatteryStatus();
-                    });
-                    
-                    battery.addEventListener('chargingchange', () => {
-                        this.batteryLevel = battery.level;
-                        this.isCharging = battery.charging;
-                        this.checkBatteryStatus();
-                    });
-                }).catch(error => {
-                    console.log('电池API访问失败:', error);
-                });
-            } catch (error) {
-                console.log('电池API初始化失败:', error);
-            }
-        } else {
-            console.log('此浏览器不支持电池状态API');
-        }
-    }
-
-    checkBatteryStatus() {
-        const now = performance.now();
-        // 只在移动设备上检查电池状态
-        if (!this.isMobile) return;
-        
-        if (now - this.lastBatteryCheck > this.batteryCheckInterval) {
-            this.lastBatteryCheck = now;
-            if (this.batteryLevel < 0.2 && !this.isCharging) {
-                this.lowBatteryMode = true;
-                console.log('低电量模式启用');
-            } else {
-                this.lowBatteryMode = false;
-                console.log('低电量模式禁用');
-            }
-        }
-    }
-
     checkInactivity(now) {
         // 检查是否超过不活动阈值
         if (now - this.lastActivityTime > this.inactivityThreshold) {
@@ -352,8 +289,8 @@ class Renderer {
                 if (this.isMobile) {
                     // 降低FPS上限
                     if (typeof RENDER_CONFIG !== 'undefined' && RENDER_CONFIG && 
-                        RENDER_CONFIG.mobile && RENDER_CONFIG.mobile.batterySaving) {
-                        RENDER_CONFIG.mobile.maxFPS = RENDER_CONFIG.mobile.batterySaving.inactiveMaxFPS;
+                        RENDER_CONFIG.mobile) {
+                        RENDER_CONFIG.mobile.maxFPS = 10; // 降低不活动时的FPS
                     }
                 }
             }
@@ -372,11 +309,6 @@ class Renderer {
                 RENDER_CONFIG.mobile.maxFPS = 30;
             }
         }
-        
-        // 调试输出当前活动状态
-        // if (this.isInactive) {
-        //     console.log(`不活动状态：已持续 ${Math.round((now - this.lastActivityTime) / 1000)} 秒`);
-        // }
     }
 }
 
