@@ -6,8 +6,8 @@ class ShadowRenderer {
         this.offscreenCtx = null;
         this.initialized = false;
         this.isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
-        this.SHADOW_OPACITY = this.isMobile ? 0.6 : 0.8;
-        this.SHADOW_BLUR = this.isMobile ? 4 : 6;
+        this.SHADOW_OPACITY = this.isMobile ? 0.5 : 0.7;
+        this.SHADOW_BLUR = this.isMobile ? 3 : 5;
         this.lastRenderTime = 0;
         this.renderInterval = this.isMobile ? 100 : 50; // 移动端10fps, 桌面端20fps
         this.lowQualityMode = this.isMobile;
@@ -47,7 +47,7 @@ class ShadowRenderer {
         this.ctx = this.canvas.getContext('2d');
         
         // 移动设备使用更低的分辨率
-        const scale = this.isMobile ? 0.6 : 1.0;
+        const scale = this.isMobile ? 0.5 : 0.75;
         this.canvas.width = 240 * scale; // 降低分辨率
         this.canvas.height = 180 * scale;
 
@@ -375,33 +375,31 @@ class ShadowRenderer {
     
     // 超简化的阴影绘制 - 用于最低质量模式
     renderUltraSimpleShadow(landmarks) {
-        // 只找出几个关键点
-        const keyPoints = [
-            landmarks[0],  // 鼻子
-            landmarks[11], // 左肩
-            landmarks[12], // 右肩
-            landmarks[23], // 左髋
-            landmarks[24]  // 右髋
-        ];
+        // 找到关键点的边界
+        let minX = 1, maxX = 0, minY = 1, maxY = 0;
         
-        // 计算中心点
-        let sumX = 0, sumY = 0, count = 0;
-        keyPoints.forEach(point => {
-            if (!point || point.visibility < 0.5) return;
-            sumX += point.x;
-            sumY += point.y;
-            count++;
-        });
+        for (const lm of landmarks) {
+            if (!lm) continue;
+            minX = Math.min(minX, lm.x);
+            maxX = Math.max(maxX, lm.x);
+            minY = Math.min(minY, lm.y);
+            maxY = Math.max(maxY, lm.y);
+        }
         
-        const centerX = (sumX / count) * this.offscreenCanvas.width;
-        const centerY = (sumY / count) * this.offscreenCanvas.height;
+        // 如果没有足够的关键点，返回
+        if (minX === 1 || maxX === 0 || minY === 1 || maxY === 0) return;
         
-        // 简单椭圆阴影
-        const width = this.offscreenCanvas.width * 0.2;
-        const height = this.offscreenCanvas.height * 0.15;
+        // 计算中心点和尺寸
+        const centerX = (minX + maxX) / 2 * this.offscreenCanvas.width;
+        const centerY = (minY + maxY) / 2 * this.offscreenCanvas.height;
         
+        // 减小阴影尺寸
+        const width = (maxX - minX) * this.offscreenCanvas.width * 0.15;
+        const height = (maxY - minY) * this.offscreenCanvas.height * 0.1;
+        
+        // 绘制椭圆阴影
         this.offscreenCtx.beginPath();
-        this.offscreenCtx.ellipse(centerX, centerY, width, height, 0, 0, Math.PI * 2);
+        this.offscreenCtx.ellipse(centerX, centerY + height * 0.5, width, height, 0, 0, Math.PI * 2);
         this.offscreenCtx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
         this.offscreenCtx.fill();
         
@@ -413,40 +411,42 @@ class ShadowRenderer {
     }
 
     renderSimplifiedShadow(landmarks) {
-        // 找出所有关键点的边界
-        const points = landmarks.filter(point => point && point.visibility > 0.5);
-        if (points.length < 5) return;
+        // 清除画布
+        this.offscreenCtx.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
         
-        // 计算中心点
-        let sumX = 0, sumY = 0, count = 0;
-        points.forEach(point => {
-            sumX += point.x;
-            sumY += point.y;
-            count++;
-        });
+        // 找到关键点的边界
+        let minX = 1, maxX = 0, minY = 1, maxY = 0;
         
-        const centerX = (sumX / count) * this.offscreenCanvas.width;
-        const centerY = (sumY / count) * this.offscreenCanvas.height;
+        for (const lm of landmarks) {
+            if (!lm) continue;
+            minX = Math.min(minX, lm.x);
+            maxX = Math.max(maxX, lm.x);
+            minY = Math.min(minY, lm.y);
+            maxY = Math.max(maxY, lm.y);
+        }
         
-        // 计算半径（简单地取最远点的距离）
-        let maxDist = 0;
-        points.forEach(point => {
-            const dx = point.x * this.offscreenCanvas.width - centerX;
-            const dy = point.y * this.offscreenCanvas.height - centerY;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            maxDist = Math.max(maxDist, dist);
-        });
+        // 如果没有足够的关键点，返回
+        if (minX === 1 || maxX === 0 || minY === 1 || maxY === 0) return;
         
-        // 绘制简单的圆形阴影
+        // 计算中心点和尺寸
+        const centerX = (minX + maxX) / 2 * this.offscreenCanvas.width;
+        const centerY = (maxY - (maxY - minY) * 0.1) * this.offscreenCanvas.height; // 向下偏移一点
+        
+        // 减小阴影尺寸
+        const width = (maxX - minX) * this.offscreenCanvas.width * 1.0;
+        const height = (maxY - minY) * this.offscreenCanvas.height * 0.6;
+        
+        // 创建径向渐变
         const gradient = this.offscreenCtx.createRadialGradient(
             centerX, centerY, 0,
-            centerX, centerY, maxDist * 1.2
+            centerX, centerY, width
         );
         gradient.addColorStop(0, `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`);
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
         
+        // 绘制椭圆阴影
         this.offscreenCtx.beginPath();
-        this.offscreenCtx.ellipse(centerX, centerY, maxDist * 1.2, maxDist * 0.8, 0, 0, Math.PI * 2);
+        this.offscreenCtx.ellipse(centerX, centerY, width, height, 0, 0, Math.PI * 2);
         this.offscreenCtx.fillStyle = gradient;
         this.offscreenCtx.fill();
         
@@ -465,7 +465,7 @@ class ShadowRenderer {
         
         // 将离屏画布内容绘制到主画布
         this.ctx.save();
-        this.ctx.globalAlpha = 0.8;
+        this.ctx.globalAlpha = 0.7;
         this.ctx.drawImage(this.offscreenCanvas, 0, 0);
         this.ctx.restore();
     }
@@ -480,12 +480,17 @@ class ShadowRenderer {
 
         // 计算躯干中心点
         const centerX = (leftShoulder.x + rightShoulder.x + leftHip.x + rightHip.x) / 4 * ctx.canvas.width;
-        const centerY = (leftShoulder.y + rightShoulder.y + leftHip.y + rightHip.y) / 4 * ctx.canvas.height;
         
-        // 计算躯干尺寸
+        // 向上调整躯干阴影位置，减少与头部的空隙
+        const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * ctx.canvas.height;
+        const hipY = (leftHip.y + rightHip.y) / 2 * ctx.canvas.height;
+        // 稍微向肩膀方向偏移中心点
+        const centerY = shoulderY + (hipY - shoulderY) * 0.25;
+        
+        // 计算躯干尺寸 - 减小尺寸
         const torsoWidth = Math.abs(leftShoulder.x - rightShoulder.x) * ctx.canvas.width;
         const torsoHeight = Math.abs(leftShoulder.y - leftHip.y) * ctx.canvas.height;
-        const radius = Math.max(torsoWidth, torsoHeight) / 1.5;
+        const radius = Math.max(torsoWidth, torsoHeight) / 2.8;
 
         // 创建径向渐变
         const gradient = ctx.createRadialGradient(
@@ -497,7 +502,7 @@ class ShadowRenderer {
 
         // 绘制躯干椭圆
         ctx.beginPath();
-        ctx.ellipse(centerX, centerY, radius, radius * 0.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(centerX, centerY, radius* 0.6, radius , 0, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
     }
@@ -521,6 +526,18 @@ class ShadowRenderer {
             y: p.y * ctx.canvas.height
         }));
 
+        // 缩短手臂长度 - 向中心点缩短20%
+        const shortenEndPoint = (point, referencePoint, shortenFactor = 0.2) => {
+            return {
+                x: point.x + (referencePoint.x - point.x) * shortenFactor,
+                y: point.y + (referencePoint.y - point.y) * shortenFactor
+            };
+        };
+        
+        // 缩短起点和终点
+        points[0] = shortenEndPoint(points[0], points[1]);
+        points[2] = shortenEndPoint(points[2], points[1]);
+
         // 创建渐变
         const gradient = ctx.createLinearGradient(
             points[0].x, points[0].y,
@@ -543,28 +560,26 @@ class ShadowRenderer {
         ctx.lineTo(points[2].x, points[2].y);
 
         // 设置线条样式
-        ctx.lineWidth = 15;  // 加粗线条
+        ctx.lineWidth = 10;  // 减小线条宽度
         ctx.lineCap = 'round';
         ctx.strokeStyle = gradient;
         ctx.stroke();
 
         // 在关节处添加圆形，但不在肘部(中间点)添加明显的圆形
-        // 只在起点和终点添加较大的圆形
-        ctx.beginPath();
-        ctx.arc(points[0].x, points[0].y, 8, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
-        ctx.fill();
         
-        // 肘部(中间点)不添加明显的圆形阴影
-        // 如果需要保留一点连续性，可以添加非常小且透明度低的圆形
+        // 起点和终点的圆形
         ctx.beginPath();
-        ctx.arc(points[1].x, points[1].y, 3, 0, Math.PI * 2); // 减小半径
-        ctx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY * 0.3})`; // 降低透明度
+        ctx.arc(points[0].x, points[0].y, 5, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.beginPath();
-        ctx.arc(points[2].x, points[2].y, 8, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
+        ctx.arc(points[2].x, points[2].y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 中间点的小圆形
+        ctx.beginPath();
+        ctx.arc(points[1].x, points[1].y, 1.5, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -572,6 +587,8 @@ class ShadowRenderer {
         const nose = landmarks[0];
         const leftEye = landmarks[2];
         const rightEye = landmarks[5];
+        const leftShoulder = landmarks[11];
+        const rightShoulder = landmarks[12];
 
         if (!nose || !leftEye || !rightEye) return;
 
@@ -580,19 +597,30 @@ class ShadowRenderer {
             Math.pow((rightEye.x - leftEye.x) * ctx.canvas.width, 2) +
             Math.pow((rightEye.y - leftEye.y) * ctx.canvas.height, 2)
         );
-        const headRadius = eyeDistance * 2;  // 增大头部大小
-
+        
+        // 增大头部阴影半径，减少与躯干的空隙
+        const headRadius = eyeDistance * 1.5;
+        
         // 创建径向渐变
         const centerX = nose.x * ctx.canvas.width;
-        const centerY = nose.y * ctx.canvas.height;
+        
+        // 如果有肩膀关键点，稍微向下调整头部阴影位置，减少与躯干的空隙
+        let centerY = nose.y * ctx.canvas.height;
+        if (leftShoulder && rightShoulder) {
+            const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * ctx.canvas.height;
+            const neckLength = shoulderY - centerY;
+            // 向下移动头部阴影中心点，减少颈部空隙
+            centerY += neckLength * 0.15;
+        }
+        
         const gradient = ctx.createRadialGradient(
             centerX, centerY, 0,
             centerX, centerY, headRadius
         );
         gradient.addColorStop(0, `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`);
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-        // 绘制头部
+        
+        // 绘制头部阴影
         ctx.beginPath();
         ctx.arc(centerX, centerY, headRadius, 0, Math.PI * 2);
         ctx.fillStyle = gradient;

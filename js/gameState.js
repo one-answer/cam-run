@@ -389,6 +389,18 @@ class GameState {
         this.state.fps = fps;
         this.updateDisplay();
     }
+    
+    // 添加初始化方法
+    init() {
+        // 重置游戏状态
+        this.reset();
+        
+        // 确保所有显示元素都已更新
+        this.updateDisplay();
+        
+        console.log('游戏状态初始化完成');
+        return this;
+    }
 }
 
 export const gameState = new GameState();

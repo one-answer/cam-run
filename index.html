@@ -7,6 +7,7 @@
     <meta name="battery-savings" content="allow">
     <title>Webcam Runner</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="manifest" href="/manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous" defer></script>
@@ -48,11 +49,11 @@
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 320px;
-            height: 240px;
+            width: 240px;
+            height: 180px;
             pointer-events: none;
             z-index: 8;
-            opacity: 0.8;
+            opacity: 0.7;
         }
         #gameStatus {
             position: fixed;
@@ -145,7 +146,7 @@
                     width: 90%;
                     left: 5%;
                     right: 5%;
-                    bottom: 10px;
+                    bottom: 40px;
                 }
             }
             /* 横屏样式 */
@@ -155,7 +156,7 @@
                     padding: 8px;
                     width: 40%;
                     right: 10px;
-                    bottom: 10px;
+                    bottom: 40px;
                     left: auto;
                 }
             }
@@ -212,17 +213,17 @@
         <p>跑步姿势：原地跑步</p>
     </div>
     <div id="gameState"></div>
-    <div id="metrics-display" style="position: fixed; bottom: 20px; right: 20px; background: rgba(0, 0, 0, 0.7); padding: 15px; border-radius: 10px; color: white; font-family: Arial, sans-serif;">
-      <div style="font-size: 24px; font-weight: bold;">
+    <div id="metrics-display" style="position: fixed; bottom: 20px; right: 20px; background: rgba(0, 0, 0, 0.7); padding: 8px; border-radius: 8px; color: white; font-family: Arial, sans-serif;">
+      <div style="font-size: 16px; font-weight: bold;">
         <span>🏃‍♂️ Speed: </span><span id="speed-bottom">0 km/h</span>
       </div>
-      <div style="font-size: 24px; font-weight: bold; margin-top: 10px;">
+      <div style="font-size: 16px; font-weight: bold; margin-top: 5px;">
         <span>👣 Steps: </span><span id="steps-bottom">0</span>
       </div>
-      <div style="font-size: 24px; font-weight: bold; margin-top: 10px;">
+      <div style="font-size: 16px; font-weight: bold; margin-top: 5px;">
         <span>🔥 Calories: </span><span id="calories-bottom">0.0</span> kcal
       </div>
-      <div style="font-size: 24px; font-weight: bold; margin-top: 10px;">
+      <div style="font-size: 16px; font-weight: bold; margin-top: 5px;">
         <span>⚖️ Weight: </span><span id="weight-bottom" title="点击修改体重">60</span> kg
       </div>
     </div>
