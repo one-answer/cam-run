@@ -374,9 +374,9 @@ class Renderer {
         }
         
         // 调试输出当前活动状态
-        if (this.isInactive) {
-            console.log(`不活动状态：已持续 ${Math.round((now - this.lastActivityTime) / 1000)} 秒`);
-        }
+        // if (this.isInactive) {
+        //     console.log(`不活动状态：已持续 ${Math.round((now - this.lastActivityTime) / 1000)} 秒`);
+        // }
     }
 }
 
