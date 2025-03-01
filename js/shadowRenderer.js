@@ -484,8 +484,8 @@ class ShadowRenderer {
         // 向上调整躯干阴影位置，减少与头部的空隙
         const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * ctx.canvas.height;
         const hipY = (leftHip.y + rightHip.y) / 2 * ctx.canvas.height;
-        // 稍微向肩膀方向偏移中心点
-        const centerY = shoulderY + (hipY - shoulderY) * 0.25;
+        // 稍微向肩膀方向偏移中心点，减少与腿部的空隙
+        const centerY = shoulderY + (hipY - shoulderY) * 0.4;
         
         // 计算躯干尺寸 - 减小尺寸
         const torsoWidth = Math.abs(leftShoulder.x - rightShoulder.x) * ctx.canvas.width;
