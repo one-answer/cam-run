@@ -59,7 +59,7 @@
             position: fixed;
             top: 10px;
             left: 10px;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.3);
             color: white;
             padding: 10px;
             border-radius: 5px;
@@ -70,7 +70,7 @@
             position: fixed;
             color: white;
             font-family: Arial, sans-serif;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.2);
             border-radius: 5px;
             z-index: 100;
         }
@@ -145,11 +145,21 @@
                     padding: 5px;
                     width: auto;
                     right: 10px;
-                    bottom: 10px;
+                    bottom: 120px; /* 将metrics-display向上移动，避免与人物阴影重叠 */
                     left: auto;
+                    z-index: 15; /* 确保metrics-display在阴影之上 */
+                    max-width: 45%; /* 限制最大宽度 */
                 }
                 #metrics-display div {
                     margin-top: 3px;
+                }
+                /* 小屏幕设备额外优化 */
+                @media screen and (max-height: 600px) {
+                    #metrics-display {
+                        bottom: 150px; /* 在更小的屏幕上进一步上移 */
+                        font-size: 11px;
+                        padding: 4px;
+                    }
                 }
             }
             /* 横屏样式 */
@@ -195,7 +205,7 @@
     <video id="webcamView" playsinline></video>
     <canvas id="skeletonCanvas"></canvas>
     <canvas id="shadowCanvas"></canvas>
-    <div id="gameStatus" >
+    <div id="gameStatus" style="display: none;" >
         游戏状态 (FPS: <span id="fps">0</span>)<br>
         动作质量: <span id="quality">0.0%</span><br>
         <span id="speed">当前速度: 0.0 m/s </span><br>
@@ -216,7 +226,7 @@
         <p>跑步姿势：原地跑步</p>
     </div>
     <div id="gameState"></div>
-    <div id="metrics-display" style="position: fixed; bottom: 20px; right: 20px; background: rgba(0, 0, 0, 0.7); padding: 8px; border-radius: 8px; color: white; font-family: Arial, sans-serif;">
+    <div id="metrics-display" style="position: fixed; right: 20px; background: rgba(0, 0, 0, 0.3); padding: 8px; border-radius: 8px; color: white; font-family: Arial, sans-serif;">
       <div style="font-size: 16px; font-weight: bold;">
         <span>🏃‍♂️ Speed: </span><span id="speed-bottom">0 km/h</span>
       </div>
