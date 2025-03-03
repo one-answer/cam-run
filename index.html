@@ -198,6 +198,22 @@
                 top: 20px;
             }
         }
+        #fullscreen-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        #fullscreen-button:hover {
+            background-color: #45a049;
+        }
     </style>
 </head>
 <body>
@@ -240,6 +256,7 @@
         <span>⚖️ Weight: </span><span id="weight-bottom" title="点击修改体重">60</span> kg
       </div>
     </div>
+    <button id="fullscreen-button">⛶</button>
     <!-- 第三方库 -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <!-- 游戏模块 -->
@@ -250,5 +267,16 @@
     <script type="module" src="js/scene.js"></script>
     <script type="module" src="js/pose.js"></script>
     <script type="module" src="js/main.js"></script>
+    <script>
+        document.getElementById('fullscreen-button').addEventListener('click', function() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        });
+    </script>
 </body>
 </html>
