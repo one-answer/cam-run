@@ -443,19 +443,19 @@ class ShadowRenderer {
         this.drawLimb(ctx, landmarks[12], landmarks[14], landmarks[16]); // 右臂
 
         // 绘制腿部
-        this.drawLimb(ctx, landmarks[23], landmarks[25], landmarks[27]); // 左腿
-        this.drawLimb(ctx, landmarks[24], landmarks[26], landmarks[28]); // 右腿
+        this.drawLimb(ctx, landmarks[23], landmarks[25], landmarks[27], true); // 左腿
+        this.drawLimb(ctx, landmarks[24], landmarks[26], landmarks[28], true); // 右腿
     }
 
-    drawLimb(ctx, start, mid, end) {
+    drawLimb(ctx, start, mid, end, isLeg = false) {
         if (!start || !mid || !end) return;
 
         // 转换坐标
         const points = [start, mid, end].map(p => ({
             x: p.x * ctx.canvas.width,
-            y: p.y * ctx.canvas.height
+            y: p.y * ctx.canvas.height + (isLeg ? -30 : 0) // 如果是腿部，向上偏移10像素
         }));
-
+        
         // 缩短手臂长度 - 向中心点缩短20%
         const shortenEndPoint = (point, referencePoint, shortenFactor = 0.2) => {
             return {
@@ -534,14 +534,8 @@ class ShadowRenderer {
         // 创建径向渐变
         const centerX = nose.x * ctx.canvas.width;
         
-        // 如果有肩膀关键点，稍微向下调整头部阴影位置，减少与躯干的空隙
-        let centerY = nose.y * ctx.canvas.height;
-        if (leftShoulder && rightShoulder) {
-            const shoulderY = (leftShoulder.y + rightShoulder.y) / 2 * ctx.canvas.height;
-            const neckLength = shoulderY - centerY;
-            // 向下移动头部阴影中心点，减少颈部空隙
-            centerY += neckLength * 0.15;
-        }
+        // 如果有肩膀关键点，向下调整头部阴影位置，减少与躯干的空隙
+        const centerY = nose.y * ctx.canvas.height + 20; // 向下偏移20像素
         
         const gradient = ctx.createRadialGradient(
             centerX, centerY, 0,
