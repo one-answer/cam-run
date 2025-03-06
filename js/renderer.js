@@ -198,14 +198,10 @@ class Renderer {
                     if (!this.isMobile && this.fps > 40 && shadowRenderer.SHADOW_QUALITY < 2 && shadowRenderer.performanceTestCompleted) {
                         // 只有当距离上次质量变化超过10秒时才考虑提高质量
                         if (now - shadowRenderer.lastQualityChangeTime > shadowRenderer.qualityChangeCooldown) {
-                            shadowRenderer.qualityChangeCounter++;
-                            // 需要连续多次检测到高帧率才提高质量
-                            if (shadowRenderer.qualityChangeCounter >= 3) {
-                                shadowRenderer.SHADOW_QUALITY = 2;
-                                shadowRenderer.lastQualityChangeTime = now;
-                                shadowRenderer.qualityChangeCounter = 0;
-                                console.log('电脑端恢复高质量阴影');
-                            }
+                            shadowRenderer.SHADOW_QUALITY = 2;
+                            shadowRenderer.lastQualityChangeTime = now;
+                            shadowRenderer.qualityChangeCounter = 0;
+                            console.log('电脑端恢复高质量阴影');
                         }
                     } else {
                         // 重置计数器
@@ -234,6 +230,31 @@ class Renderer {
         if (this.debugElement) {
             this.debugElement.textContent = `FPS: ${this.fps} | 内存: ${Math.round(this.memory)}MB | ${this.isInactive ? '不活动' : '活动中'} | 阴影质量: ${shadowRenderer ? shadowRenderer.SHADOW_QUALITY : 'N/A'}`;
         }
+    }
+
+    updateSkeleton(landmarks) {
+        const now = performance.now();
+        
+        // 移动端帧率控制（硬性限制）
+        if (this.isMobile && now - renderController.lastFrame < 1000/MOBILE_RENDER_PRO.TARGET_FPS) {
+            return;
+        }
+
+        // 渐进式批处理渲染（新增）
+        const batchStart = renderController.currentBatch * MOBILE_RENDER_PRO.BATCH_SIZE;
+        const batchEnd = batchStart + MOBILE_RENDER_PRO.BATCH_SIZE;
+        
+        MOBILE_RENDER_PRO.KEY_POINTS.slice(batchStart, batchEnd).forEach(i => {
+            const matrix = renderController.matrixPool[
+                (renderController.currentBatch) % MOBILE_RENDER_PRO.CACHE_POOL_SIZE
+            ];
+            // 仅更新关键节点...
+        });
+
+        renderController.currentBatch = 
+            (renderController.currentBatch + 1) % 
+            Math.ceil(MOBILE_RENDER_PRO.KEY_POINTS.length / MOBILE_RENDER_PRO.BATCH_SIZE);
+        renderController.lastFrame = now;
     }
 
     updateShadow(video, results) {
@@ -311,6 +332,22 @@ class Renderer {
         }
     }
 }
+
+// 移动端渲染终极配置（新增）
+const MOBILE_RENDER_PRO = {
+  TARGET_FPS: 15,
+  CACHE_POOL_SIZE: 24,
+  KEY_POINTS: [0,5,11,12,13,14,15,16,23,24,25,26,27,28], // 关键骨骼节点索引
+  BATCH_SIZE: 4
+};
+
+// 智能渲染控制器（新增）
+let renderController = {
+  lastFrame: 0,
+  currentBatch: 0,
+  matrixPool: Array.from({length: MOBILE_RENDER_PRO.CACHE_POOL_SIZE}, 
+    () => new DOMMatrix())
+};
 
 export const renderer = new Renderer();
 

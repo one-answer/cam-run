@@ -28,7 +28,7 @@ export const GAME_CONFIG = {
     },
     // 速度相关
     maxSpeed: 6,              // 提高最大速度上限
-    acceleration: 0.08,       // 提高加速度使变化更快
+    acceleration: 0.12,       // 提高加速度使变化更快
     deceleration: 0.12,       // 保持减速度不变
     runningThreshold: 0.5,    // 降低运动阈值，使其更容易达到运动状态
     bufferSize: 10,          // 减少缓冲区大小以更快地响应变化
@@ -142,7 +142,9 @@ export const RENDER_CONFIG = {
     },
     // 移动端特定渲染设置
     mobile: {
-        shadowMapSize: 512,     // 移动端降低阴影贴图大小
+        shadowMapType: THREE.BasicShadowMap, // 从PCFSoftShadowMap改为Basic
+        shadowFilterQuality: 0, // 禁用滤波
+        shadowMapSize: 256,     // 移动端降低阴影贴图大小
         maxFPS: 30,             // 移动端最大FPS
         maxDecorations: 200,    // 移动端减少装饰物数量
         textureQuality: 0.7,    // 纹理质量降低

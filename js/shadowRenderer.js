@@ -6,10 +6,10 @@ class ShadowRenderer {
         this.offscreenCtx = null;
         this.initialized = false;
         this.isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
-        this.SHADOW_OPACITY = this.isMobile ? 0.5 : 0.7;
-        this.SHADOW_BLUR = this.isMobile ? 3 : 5;
+        this.SHADOW_OPACITY = this.isMobile ? 0.3 : 0.7;
+        this.SHADOW_BLUR = this.isMobile ? 1 : 5;
         this.lastRenderTime = 0;
-        this.renderInterval = this.isMobile ? 100 : 50; // 移动端10fps, 桌面端20fps
+        this.renderInterval = this.isMobile ? 150 : 50; // 移动端10fps, 桌面端20fps
         this.lowQualityMode = this.isMobile;
         this.SHADOW_QUALITY = 2;
         this.tempLowQuality = false;
@@ -34,8 +34,8 @@ class ShadowRenderer {
         this.qualityChangeCooldown = 10000; // 10秒冷却时间
         
         // 新增分辨率缩放参数
-        this.minScale = this.isMobile ? 0.3 : 0.5;
-        this.maxScale = this.isMobile ? 0.7 : 1.0;
+        this.minScale = this.isMobile ? 0.2 : 0.5;
+        this.maxScale = this.isMobile ? 0.5 : 1.0;
         this.currentScale = this.isMobile ? 0.5 : 0.75;
         this.scaleStep = 0.1;
 
@@ -131,6 +131,7 @@ class ShadowRenderer {
         } else { // 性能良好
             this.devicePerformanceScore = 2;
             this.renderInterval = 50; // 20fps
+            this.SHADOW_QUALITY = 2;
             console.log('性能良好，保持高质量');
         }
         
@@ -349,21 +350,26 @@ class ShadowRenderer {
         
         // 计算中心点和尺寸
         const centerX = (minX + maxX) / 2 * this.offscreenCanvas.width;
-        const centerY = (minY + maxY) / 2 * this.offscreenCanvas.height;
         
-        // 减小阴影尺寸
-        const width = (maxX - minX) * this.offscreenCanvas.width * 0.15;
-        const height = (maxY - minY) * this.offscreenCanvas.height * 0.1;
+        // 向上调整躯干阴影位置，减少与头部的空隙
+        const shoulderY = (landmarks[11].y + landmarks[12].y) / 2 * this.offscreenCanvas.height;
+        const hipY = (landmarks[23].y + landmarks[24].y) / 2 * this.offscreenCanvas.height;
+        // 稍微向肩膀方向偏移中心点，减少与腿部的空隙
+        const centerY = shoulderY + (hipY - shoulderY) * 0.4;
+        
+        // 增大阴影尺寸
+        const width = (maxX - minX) * this.offscreenCanvas.width * 0.3;
+        const height = (maxY - minY) * this.offscreenCanvas.height * 0.15;
         
         // 绘制椭圆阴影
         this.offscreenCtx.beginPath();
         this.offscreenCtx.ellipse(centerX, centerY + height * 0.5, width, height, 0, 0, Math.PI * 2);
-        this.offscreenCtx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY})`;
+        this.offscreenCtx.fillStyle = `rgba(0, 0, 0, ${this.SHADOW_OPACITY * 1.5})`;
         this.offscreenCtx.fill();
         
         // 将离屏画布内容绘制到主画布
         this.ctx.save();
-        this.ctx.globalAlpha = 0.3;
+        this.ctx.globalAlpha = 0.6;
         this.ctx.drawImage(this.offscreenCanvas, 0, 0);
         this.ctx.restore();
     }
@@ -453,7 +459,7 @@ class ShadowRenderer {
         // 转换坐标
         const points = [start, mid, end].map(p => ({
             x: p.x * ctx.canvas.width,
-            y: p.y * ctx.canvas.height + (isLeg ? -30 : 0) // 如果是腿部，向上偏移10像素
+            y: p.y * ctx.canvas.height + (isLeg ? -ctx.canvas.height * 0.2 : 0) // 腿部向上偏移
         }));
         
         // 缩短手臂长度 - 向中心点缩短20%
@@ -535,7 +541,7 @@ class ShadowRenderer {
         const centerX = nose.x * ctx.canvas.width;
         
         // 如果有肩膀关键点，向下调整头部阴影位置，减少与躯干的空隙
-        const centerY = nose.y * ctx.canvas.height + 20; // 向下偏移20像素
+        const centerY = nose.y * ctx.canvas.height + ctx.canvas.height * 0.02; // 向下偏移2%画布高度
         
         const gradient = ctx.createRadialGradient(
             centerX, centerY, 0,

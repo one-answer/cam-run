@@ -1,4 +1,5 @@
 import { GAME_CONFIG, RENDER_CONFIG } from './config.js';
+import { renderer } from './renderer.js';
 
 class Scene {
     constructor() {
@@ -152,17 +153,29 @@ class Scene {
     updateSpeed(speed) {
         this.speed = speed;
         
-        const cameraHeight = 2 + Math.sin(performance.now() * 0.005) * (speed * 0.06); 
-        const cameraX = Math.cos(performance.now() * 0.003) * (speed * 0.04); 
+        // 增强摄像机高度变化和左右摇摆
+        const cameraHeight = 2 + Math.sin(performance.now() * 0.005) * (speed * 0.08); 
+        const cameraX = Math.cos(performance.now() * 0.003) * (speed * 0.06); 
         
         this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, cameraHeight, 0.15); 
         this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, cameraX, 0.15); 
-        this.camera.position.z += speed * 0.025; 
         
+        // 为移动设备设置更高的速度系数
+        let speedMultiplier = 0.02; // PC端默认系数
+        
+        // 检测是否为移动设备，使用导入的renderer对象
+        if (renderer && renderer.isMobile) {
+            speedMultiplier = 0.18; // 移动端使用更高的系数
+        }
+        
+        // 应用速度系数
+        this.camera.position.z += speed * speedMultiplier;
+        
+        // 调整视角，增强前进感
         const lookAtPoint = new THREE.Vector3(
             0,
             this.camera.position.y + 0.5,
-            this.camera.position.z + 12 
+            this.camera.position.z + 15 // 增加前视距离
         );
         this.camera.lookAt(lookAtPoint);
 

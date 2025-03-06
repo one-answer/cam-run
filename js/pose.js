@@ -17,6 +17,7 @@ class PoseDetector {
         this.isProcessing = false;        // 防止并行处理
         this.isCloseUpMode = false;       // 新增：是否处于近距离模式
         this.shoulderDistance = 0;        // 新增：肩膀之间的距离，用于判断用户与摄像头的距离
+        this.lastAnalysisTime = 0;        // 新增：上次分析时间
         
         // 用户体重，默认60kg
         this.userWeight = 60;
@@ -385,7 +386,12 @@ class PoseDetector {
         gameState.setState({
             movementQuality: Math.round(smoothedScore * 100)
         });
-        gameState.updateMovement(isRunning ? smoothedScore : 0);
+        
+        // 添加时间差计算
+        const deltaTime = this.lastAnalysisTime ? (now - this.lastAnalysisTime) / 1000 : 1/60;
+        this.lastAnalysisTime = now;
+        
+        gameState.updateMovement(isRunning ? smoothedScore : 0, deltaTime);
     }
     
     // 新增：检测并更新手臂相位
