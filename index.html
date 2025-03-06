@@ -215,15 +215,22 @@
         #fullscreen-button:hover {
             background-color: #45a049;
         }
-        .github-icon {
+        .icon-container {
             position: fixed;
-            top: 30px;
-            right: 70px;
-            color: #666;
+            top: 20px;
+            right: 65px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .icon-container a {
+            color: #333;
             font-size: 24px;
             text-decoration: none;
-            z-index: 100;
-            transform: translateY(-50%);
+            transition: color 0.3s;
+        }
+        .icon-container a:hover {
+            color: #000;
         }
     </style>
 </head>
@@ -260,10 +267,14 @@
         <span>⚖️ Weight: </span><span id="weight-bottom" title="点击修改体重">60</span> kg
       </div>
     </div>
-    <button id="shareButton" style="margin-right: 10px; position: fixed; top: 30px; right: 70px;">分享</button>
-    <a href="https://github.com/Jamesun921/cam-run" target="_blank" class="github-icon">
-        <i class="fab fa-github"></i>
-    </a>
+    <div class="icon-container">
+        <a id="shareButton" href="#">
+            <i class="fas fa-share-square"></i>
+        </a>
+        <a href="https://github.com/Jamesun921/cam-run" target="_blank">
+            <i class="fab fa-github"></i>
+        </a>
+    </div>
     <button id="fullscreen-button">⛶</button>
     <!-- 第三方库 -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
