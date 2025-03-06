@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.4.1633558788/pose.js" crossorigin="anonymous" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
             margin: 0;
@@ -214,6 +215,16 @@
         #fullscreen-button:hover {
             background-color: #45a049;
         }
+        .github-icon {
+            position: fixed;
+            top: 30px;
+            right: 70px;
+            color: #666;
+            font-size: 24px;
+            text-decoration: none;
+            z-index: 100;
+            transform: translateY(-50%);
+        }
     </style>
 </head>
 <body>
@@ -221,7 +232,7 @@
     <video id="webcamView" playsinline></video>
     <canvas id="skeletonCanvas"></canvas>
     <canvas id="shadowCanvas"></canvas>
-    <div id="gameStatus" style="display: block;" >
+    <div id="gameStatus" style="display: none;" >
         游戏状态 (FPS: <span id="fps">0</span>)<br>
         动作质量: <span id="quality">0.0%</span><br>
         <span id="speed">当前速度: 0.0 m/s </span><br>
@@ -229,13 +240,6 @@
         卡路里: <span id="calories">0.0</span> kcal<br>
         体重: <span id="user-weight-debug" title="点击修改体重">60</span> kg<br>
         调试信息: <span id="debug">准备开始...</span>
-    </div>
-    <div id="gameInfo">
-        <div id="speedDisplay">速度: 0</div>
-        <div id="stepDisplay">步数: 0</div>
-        <div id="calorieDisplay">卡路里: 0</div>
-        <div id="weightDisplay">体重: 60kg</div>
-        <div id="debugInfo"></div>
     </div>
     <div id="instructions">
         <h2>Webcam Runner</h2>
@@ -256,6 +260,10 @@
         <span>⚖️ Weight: </span><span id="weight-bottom" title="点击修改体重">60</span> kg
       </div>
     </div>
+    <button id="shareButton" style="margin-right: 10px; position: fixed; top: 30px; right: 70px;">分享</button>
+    <a href="https://github.com/Jamesun921/cam-run" target="_blank" class="github-icon">
+        <i class="fab fa-github"></i>
+    </a>
     <button id="fullscreen-button">⛶</button>
     <!-- 第三方库 -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>

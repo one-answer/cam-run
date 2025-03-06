@@ -39,6 +39,9 @@ class Renderer {
         // 初始化调试元素
         this.debugElement = document.getElementById('debug');
         
+        // 初始化骨骼渲染优化
+        initSkeletonOptimization();
+        
         this.initialized = true;
     }
 
@@ -233,7 +236,65 @@ class Renderer {
     }
 
     updateSkeleton(landmarks) {
+        if (!landmarks) return;
+        
         const now = performance.now();
+        
+        // 移动端骨骼渲染优化
+        if (this.isMobile && MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.enabled) {
+            // 节流渲染
+            if (MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.throttleRender && 
+                now - renderController.skeletonRenderer.lastRenderTime < MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.renderInterval) {
+                return;
+            }
+            
+            // 确保离屏渲染已初始化
+            if (!renderController.skeletonRenderer.isInitialized) {
+                initSkeletonOptimization();
+                if (!renderController.skeletonRenderer.isInitialized) return;
+            }
+            
+            // 清除离屏画布
+            const offCtx = renderController.skeletonRenderer.offscreenCtx;
+            offCtx.clearRect(0, 0, offCtx.canvas.width, offCtx.canvas.height);
+            
+            // 在离屏画布上绘制骨骼
+            this.drawSkeleton(landmarks, offCtx);
+            
+            // 使用帧缓冲
+            if (MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.frameBuffering) {
+                // 获取当前缓冲区
+                const currentBuffer = renderController.skeletonRenderer.buffers[
+                    renderController.skeletonRenderer.currentBufferIndex
+                ];
+                
+                // 将离屏画布内容复制到当前缓冲区
+                currentBuffer.ctx.clearRect(0, 0, currentBuffer.canvas.width, currentBuffer.canvas.height);
+                currentBuffer.ctx.drawImage(renderController.skeletonRenderer.offscreenCanvas, 0, 0);
+                currentBuffer.timestamp = now;
+                
+                // 更新缓冲区索引
+                renderController.skeletonRenderer.currentBufferIndex = 
+                    (renderController.skeletonRenderer.currentBufferIndex + 1) % 
+                    MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.bufferSize;
+                
+                // 将缓冲区内容绘制到实际画布
+                this.skeletonCtx.clearRect(0, 0, this.skeletonCanvas.width, this.skeletonCanvas.height);
+                this.skeletonCtx.drawImage(currentBuffer.canvas, 0, 0);
+            } else {
+                // 直接将离屏画布内容绘制到实际画布
+                this.skeletonCtx.clearRect(0, 0, this.skeletonCanvas.width, this.skeletonCanvas.height);
+                this.skeletonCtx.drawImage(renderController.skeletonRenderer.offscreenCanvas, 0, 0);
+            }
+            
+            // 保存关键点用于插值
+            if (MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.interpolation) {
+                renderController.skeletonRenderer.previousLandmarks = [...landmarks];
+            }
+            
+            renderController.skeletonRenderer.lastRenderTime = now;
+            return;
+        }
         
         // 移动端帧率控制（硬性限制）
         if (this.isMobile && now - renderController.lastFrame < 1000/MOBILE_RENDER_PRO.TARGET_FPS) {
@@ -255,6 +316,53 @@ class Renderer {
             (renderController.currentBatch + 1) % 
             Math.ceil(MOBILE_RENDER_PRO.KEY_POINTS.length / MOBILE_RENDER_PRO.BATCH_SIZE);
         renderController.lastFrame = now;
+        
+        // 绘制骨骼
+        this.clearCanvas(this.skeletonCtx);
+        this.drawSkeleton(landmarks, this.skeletonCtx);
+    }
+    
+    // 添加骨骼绘制方法
+    drawSkeleton(landmarks, ctx) {
+        if (!landmarks || !ctx) return;
+        
+        const { color, lineWidth, radius, connections } = SKELETON_CONFIG;
+        
+        // 绘制连接线
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        
+        for (const [i, j] of connections) {
+            if (landmarks[i] && landmarks[j]) {
+                const start = landmarks[i];
+                const end = landmarks[j];
+                
+                // 检查关键点可见性
+                if (start.visibility < 0.5 || end.visibility < 0.5) continue;
+                
+                ctx.moveTo(start.x * ctx.canvas.width, start.y * ctx.canvas.height);
+                ctx.lineTo(end.x * ctx.canvas.width, end.y * ctx.canvas.height);
+            }
+        }
+        ctx.stroke();
+        
+        // 绘制关节点
+        ctx.fillStyle = color;
+        for (let i = 0; i < landmarks.length; i++) {
+            const landmark = landmarks[i];
+            if (landmark && landmark.visibility > 0.5) {
+                ctx.beginPath();
+                ctx.arc(
+                    landmark.x * ctx.canvas.width,
+                    landmark.y * ctx.canvas.height,
+                    radius,
+                    0,
+                    2 * Math.PI
+                );
+                ctx.fill();
+            }
+        }
     }
 
     updateShadow(video, results) {
@@ -335,10 +443,19 @@ class Renderer {
 
 // 移动端渲染终极配置（新增）
 const MOBILE_RENDER_PRO = {
-  TARGET_FPS: 15,
+  TARGET_FPS: 30,
   CACHE_POOL_SIZE: 24,
   KEY_POINTS: [0,5,11,12,13,14,15,16,23,24,25,26,27,28], // 关键骨骼节点索引
-  BATCH_SIZE: 4
+  BATCH_SIZE: 4,
+  SKELETON_OPTIMIZATION: {
+    enabled: true,
+    useOffscreenCanvas: true,    // 使用离屏渲染
+    frameBuffering: true,        // 启用帧缓冲
+    bufferSize: 10,               // 缓冲区大小
+    interpolation: true,         // 启用关键点插值
+    throttleRender: true,        // 节流渲染
+    renderInterval: 50           // 渲染间隔(ms)
+  }
 };
 
 // 智能渲染控制器（新增）
@@ -346,8 +463,69 @@ let renderController = {
   lastFrame: 0,
   currentBatch: 0,
   matrixPool: Array.from({length: MOBILE_RENDER_PRO.CACHE_POOL_SIZE}, 
-    () => new DOMMatrix())
+    () => new DOMMatrix()),
+  skeletonRenderer: {
+    offscreenCanvas: null,
+    offscreenCtx: null,
+    buffers: [],
+    currentBufferIndex: 0,
+    lastRenderTime: 0,
+    isInitialized: false,
+    previousLandmarks: null
+  }
 };
+
+// 初始化骨骼渲染优化
+function initSkeletonOptimization() {
+  if (!renderController.skeletonRenderer.isInitialized && MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.enabled) {
+    const renderer = window.renderer;
+    if (!renderer || !renderer.skeletonCanvas) return;
+    
+    // 创建离屏画布
+    if (MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.useOffscreenCanvas && typeof OffscreenCanvas !== 'undefined') {
+      try {
+        renderController.skeletonRenderer.offscreenCanvas = new OffscreenCanvas(
+          renderer.skeletonCanvas.width,
+          renderer.skeletonCanvas.height
+        );
+        renderController.skeletonRenderer.offscreenCtx = renderController.skeletonRenderer.offscreenCanvas.getContext('2d');
+      } catch (e) {
+        console.warn('离屏画布创建失败，回退到普通缓冲', e);
+        // 回退到普通缓冲
+        renderController.skeletonRenderer.offscreenCanvas = document.createElement('canvas');
+        renderController.skeletonRenderer.offscreenCanvas.width = renderer.skeletonCanvas.width;
+        renderController.skeletonRenderer.offscreenCanvas.height = renderer.skeletonCanvas.height;
+        renderController.skeletonRenderer.offscreenCtx = renderController.skeletonRenderer.offscreenCanvas.getContext('2d');
+      }
+    } else {
+      // 回退到普通缓冲
+      renderController.skeletonRenderer.offscreenCanvas = document.createElement('canvas');
+      renderController.skeletonRenderer.offscreenCanvas.width = renderer.skeletonCanvas.width;
+      renderController.skeletonRenderer.offscreenCanvas.height = renderer.skeletonCanvas.height;
+      renderController.skeletonRenderer.offscreenCtx = renderController.skeletonRenderer.offscreenCanvas.getContext('2d');
+    }
+    
+    // 初始化帧缓冲
+    if (MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.frameBuffering) {
+      for (let i = 0; i < MOBILE_RENDER_PRO.SKELETON_OPTIMIZATION.bufferSize; i++) {
+        const buffer = document.createElement('canvas');
+        buffer.width = renderer.skeletonCanvas.width;
+        buffer.height = renderer.skeletonCanvas.height;
+        renderController.skeletonRenderer.buffers.push({
+          canvas: buffer,
+          ctx: buffer.getContext('2d'),
+          timestamp: 0
+        });
+      }
+    }
+    
+    renderController.skeletonRenderer.isInitialized = true;
+    console.log('骨骼渲染优化初始化完成');
+  }
+}
+
+// 导出初始化函数供外部调用
+export { initSkeletonOptimization };
 
 export const renderer = new Renderer();
 

@@ -70,17 +70,14 @@ class GameState {
         this.updateDisplay();
     }
 
-    updateMovement(quality, deltaTime = 1/60) {
+    updateMovement(quality) {
         // 更新动作质量
         this.state.movementQuality = quality * 100;
-
-        // 计算帧率标准化比例（基准为60FPS）
-        const frameTimeRatio = deltaTime * 60;
 
         // 更新速度
         if (quality > 0) {
             this.state.currentSpeed = Math.min(
-                this.state.currentSpeed + GAME_CONFIG.acceleration * frameTimeRatio,
+                this.state.currentSpeed + GAME_CONFIG.acceleration,
                 GAME_CONFIG.maxSpeed
             );
             
@@ -92,7 +89,7 @@ class GameState {
         } else {
             this.state.currentSpeed = Math.max(
                 0,
-                this.state.currentSpeed - GAME_CONFIG.deceleration * frameTimeRatio
+                this.state.currentSpeed - GAME_CONFIG.deceleration
             );
         }
 
@@ -421,6 +418,14 @@ class GameState {
         
         console.log('游戏状态初始化完成');
         return this;
+    }
+
+    getSteps() {
+        return this.state.stepCount;
+    }
+
+    getCalories() {
+        return this.state.caloriesBurned;
     }
 }
 

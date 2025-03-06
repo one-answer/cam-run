@@ -203,4 +203,16 @@ class Game {
 window.addEventListener('load', () => {
     const game = new Game();
     game.init().catch(console.error);
+    
+    document.getElementById('shareButton').addEventListener('click', function() {
+        const websiteUrl = window.location.href;
+        const steps = gameState.getSteps(); 
+        const calories = gameState.getCalories(); 
+        const shareText = `我刚在${websiteUrl}上完成了${steps}步，消耗了${calories}卡路里！你也来试试吧！`;
+        navigator.clipboard.writeText(shareText).then(function() {
+            alert('分享内容已复制到剪贴板！');
+        }, function(err) {
+            console.error('无法复制分享内容: ', err);
+        });
+    });
 });

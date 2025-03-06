@@ -49,6 +49,24 @@ class ShadowRenderer {
         // 优化内存检查间隔
         this.memoryUsageHistory = [];
         this.maxMemoryHistoryLength = 10;
+        
+        // iPad 5 优化配置
+        if (this.isMobile && navigator.userAgent.includes('iPad5')) {
+            // 降低分辨率
+            this.currentScale = 0.3; // 将分辨率降低到 30%
+            this.canvas.width = 240 * this.currentScale;
+            this.canvas.height = 180 * this.currentScale;
+
+            // 减少阴影质量
+            this.SHADOW_OPACITY = 0.2; // 降低阴影透明度
+            this.SHADOW_BLUR = 0; // 取消阴影模糊
+
+            // 增加渲染间隔
+            this.renderInterval = 200; // 将渲染间隔增加到 200ms
+
+            // 减少缓存池大小
+            this.CACHE_POOL_SIZE = 12; // 将缓存池大小减少到 12
+        }
     }
 
     init() {
@@ -357,7 +375,7 @@ class ShadowRenderer {
         // 稍微向肩膀方向偏移中心点，减少与腿部的空隙
         const centerY = shoulderY + (hipY - shoulderY) * 0.4;
         
-        // 增大阴影尺寸
+        // 计算躯干尺寸 - 减小尺寸
         const width = (maxX - minX) * this.offscreenCanvas.width * 0.3;
         const height = (maxY - minY) * this.offscreenCanvas.height * 0.15;
         
