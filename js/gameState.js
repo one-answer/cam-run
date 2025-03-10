@@ -169,6 +169,13 @@ class GameState {
         // 新增：检测是否处于近距离模式
         this.state.isCloseUpMode = window.poseDetector && window.poseDetector.isCloseUpMode;
         
+        // 检测用户是否开始跑步，并触发自定义事件
+        if ((this.state.isCloseUpMode || isPhaseChange) && canCountStep && this.state.stepCount === 0) {
+            // 用户开始跑步，触发自定义事件
+            const userStartedRunningEvent = new Event('userStartedRunning');
+            window.dispatchEvent(userStartedRunningEvent);
+        }
+        
         // 在近距离模式下，使用更灵敏的步数检测
         if (this.state.isCloseUpMode) {
             // 记录当前动作质量到历史记录

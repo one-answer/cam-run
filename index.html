@@ -76,16 +76,25 @@
             z-index: 100;
         }
         #instructions {
-            composes: overlay;
             top: 10px;
             left: 10px;
             padding: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.2);
+            border-radius: 5px;
+            z-index: 100;
         }
         #fps {
-            composes: overlay;
+            position: fixed;
             top: 10px;
             right: 10px;
             padding: 5px 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            background: rgba(0,0,0,0.2);
+            border-radius: 5px;
+            z-index: 100;
         }
         #gameState {
             position: fixed;
@@ -232,6 +241,40 @@
         .icon-container a:hover {
             color: #000;
         }
+        
+        /* 引导提示框样式 */
+        #guide-prompt {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.4);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            text-align: center;
+            z-index: 2000;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            max-width: 80%;
+            transition: opacity 1.5s ease, visibility 1.5s ease;
+        }
+        
+        #guide-prompt h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        
+        #guide-prompt p {
+            margin-bottom: 0;
+        }
+        
+        @media screen and (max-width: 768px) {
+            #guide-prompt {
+                font-size: 16px;
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -239,6 +282,14 @@
     <video id="webcamView" playsinline></video>
     <canvas id="skeletonCanvas"></canvas>
     <canvas id="shadowCanvas"></canvas>
+    
+    <!-- 引导提示框 -->
+    <div id="guide-prompt">
+        <h3>准备开始</h3>
+        <p>请站在摄像头前，开始原地跑步！</p>
+        <p>系统将自动检测您的跑步动作</p>
+    </div>
+    
     <div id="gameStatus" style="display: none;" >
         游戏状态 (FPS: <span id="fps">0</span>)<br>
         动作质量: <span id="quality">0.0%</span><br>
@@ -250,7 +301,9 @@
     </div>
     <div id="instructions">
         <h2>Webcam Runner</h2>
-        <p>跑步姿势：原地跑步</p>
+        <p>请给应用摄像头访问权限。</p>
+        <p>请站在摄像头前，开始原地跑步！</p>
+        <p>系统将自动检测您的跑步动作</p>
     </div>
     <div id="gameState"></div>
     <div id="metrics-display" style="position: fixed; right: 20px; background: rgba(0, 0, 0, 0.3); padding: 8px; border-radius: 8px; color: white; font-family: Arial, sans-serif;">
@@ -295,6 +348,26 @@
                     document.exitFullscreen();
                 }
             }
+        });
+        
+        // 引导提示框逻辑
+        document.addEventListener('DOMContentLoaded', function() {
+            const guidePrompt = document.getElementById('guide-prompt');
+            
+            // 显示提示框
+            guidePrompt.style.display = 'block';
+            
+            // 监听用户开始跑步的事件
+            window.addEventListener('userStartedRunning', function() {
+                // 逐渐隐藏提示框
+                guidePrompt.style.opacity = '0';
+                guidePrompt.style.visibility = 'hidden';
+                
+                // 在动画完成后完全隐藏元素
+                setTimeout(function() {
+                    guidePrompt.style.display = 'none';
+                }, 1500);
+            });
         });
     </script>
 </body>
