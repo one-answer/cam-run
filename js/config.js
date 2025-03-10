@@ -103,6 +103,32 @@ export const GAME_CONFIG = {
     // 步伐检测相关参数
     minStepInterval: 150,            // 进一步减少最小步伐间隔（毫秒），使步数增长更快
     armPhaseThreshold: 0.05,         // 保持手臂相位变化阈值不变
+    
+    // 新增：AI陪跑功能配置
+    aiCompanion: {
+        enabled: true,                // 启用AI陪跑功能
+        promptTypes: ['Encouragement', 'Prank', 'Fun Facts', 'Challenge'], // 提示语类型
+        defaultFrequency: 'Medium',      // 默认提示频率
+        defaultStyle: 'Humorous',          // 默认提示风格
+        displayDuration: 5000,        // 提示语显示时间(毫秒)
+        // 提示语间隔时间范围(毫秒)
+        intervalRange: {
+            low: { min: 60000, max: 120000 },      // 低频率：1-2分钟
+            medium: { min: 30000, max: 60000 },    // 中等频率：30秒-1分钟
+            high: { min: 15000, max: 30000 }       // 高频率：15-30秒
+        },
+        // 情绪检测阈值
+        emotionThresholds: {
+            tired: 2.0,               // 低于此速度视为疲惫(当跑步时间>60秒)
+            excited: 4.0              // 高于此速度视为兴奋
+        },
+        // API配置
+        apiConfig: { // 向 https://github.com/liseami/DeepRant 致敬
+            url: 'https://api.siliconflow.cn/v1/chat/completions',                  // API地址，留空则使用本地提示语
+            model: 'deepseek-ai/DeepSeek-V3',   // 模型名称
+            apiKey: 'sk-jleighwqdtyssxeycgmwxqrhbofpsbkhtobofxhbeyebupyh'                // API密钥，实际使用时应从环境变量或用户输入获取
+        }
+    }
 };
 
 // 骨骼渲染配置

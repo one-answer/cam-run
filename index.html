@@ -269,11 +269,103 @@
             margin-bottom: 0;
         }
         
+        /* AI提示语样式 */
+        .ai-prompt {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+            display: none;
+            text-align: center;
+            max-width: 80%;
+            transition: opacity 0.5s ease-in-out;
+            opacity: 0;
+        }
+        
+        @media screen and (max-width: 768px) {
+            .ai-prompt {
+                font-size: 1.5em;
+                padding: 15px;
+            }
+        }
+        
         @media screen and (max-width: 768px) {
             #guide-prompt {
                 font-size: 16px;
                 padding: 15px;
             }
+        }
+        
+        /* AI陪跑设置对话框样式 */
+        .modal-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: none;
+        }
+        
+        .modal-header {
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h3 {
+            margin-top: 0;
+        }
+        
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .setting-group {
+            margin-bottom: 20px;
+        }
+        
+        .setting-group label {
+            display: block;
+            margin-bottom: 10px;
+        }
+        
+        .checkbox-group {
+            margin-bottom: 10px;
+        }
+        
+        .checkbox-group label {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        
+        .modal-footer {
+            text-align: right;
+        }
+        
+        #save-ai-settings {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        
+        #save-ai-settings:hover {
+            background-color: #45a049;
         }
     </style>
 </head>
@@ -285,25 +377,68 @@
     
     <!-- 引导提示框 -->
     <div id="guide-prompt">
-        <h3>准备开始</h3>
-        <p>请站在摄像头前，开始原地跑步！</p>
-        <p>系统将自动检测您的跑步动作</p>
+        <h3>Get Ready</h3>
+        <p>Please stand in front of the camera and start running in place!</p>
+        <p>The system will automatically detect your running motion</p>
+    </div>
+    
+    <!-- AI提示语 -->
+    <div class="ai-prompt" id="ai-prompt"></div>
+    
+    <!-- AI陪跑设置对话框 -->
+    <div id="ai-settings-dialog" class="modal-dialog" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>AI Running Companion Settings</h3>
+                <span class="close-button" id="close-ai-settings">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>Prompt Type:</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" name="promptType" value="Encouragement" checked> Encouragement</label>
+                        <label><input type="checkbox" name="promptType" value="Teasing"> Teasing</label>
+                        <label><input type="checkbox" name="promptType" value="Fun Facts" checked> Fun Facts</label>
+                        <label><input type="checkbox" name="promptType" value="Challenge Tasks"> Challenge Tasks</label>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label>Prompt Frequency:</label>
+                    <select id="promptFrequency">
+                        <option value="Low">Low</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Prompt Style:</label>
+                    <select id="promptStyle">
+                        <option value="Humorous" selected>Humorous</option>
+                        <option value="Serious">Serious</option>
+                        <option value="Motivational">Motivational</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-ai-settings">Save Settings</button>
+            </div>
+        </div>
     </div>
     
     <div id="gameStatus" style="display: none;" >
-        游戏状态 (FPS: <span id="fps">0</span>)<br>
-        动作质量: <span id="quality">0.0%</span><br>
-        <span id="speed">当前速度: 0.0 m/s </span><br>
-        步数: <span id="steps">0</span><br>
-        卡路里: <span id="calories">0.0</span> kcal<br>
-        体重: <span id="user-weight-debug" title="点击修改体重">60</span> kg<br>
-        调试信息: <span id="debug">准备开始...</span>
+        Game Status (FPS: <span id="fps">0</span>)<br>
+        Motion Quality: <span id="quality">0.0%</span><br>
+        <span id="speed">Current Speed: 0.0 m/s </span><br>
+        Steps: <span id="steps">0</span><br>
+        Calories: <span id="calories">0.0</span> kcal<br>
+        Weight: <span id="user-weight-debug" title="Click to change weight">60</span> kg<br>
+        Debug Info: <span id="debug">Getting ready...</span>
     </div>
     <div id="instructions">
         <h2>Webcam Runner</h2>
-        <p>请给应用摄像头访问权限。</p>
-        <p>请站在摄像头前，开始原地跑步！</p>
-        <p>系统将自动检测您的跑步动作</p>
+        <p>Please grant camera access to the application.</p>
+        <p>Please stand in front of the camera and start running in place!</p>
+        <p>The system will automatically detect your running motion</p>
     </div>
     <div id="gameState"></div>
     <div id="metrics-display" style="position: fixed; right: 20px; background: rgba(0, 0, 0, 0.3); padding: 8px; border-radius: 8px; color: white; font-family: Arial, sans-serif;">
@@ -317,12 +452,15 @@
         <span>🔥 Calories: </span><span id="calories-bottom">0.0</span> kcal
       </div>
       <div style="font-size: 16px; font-weight: bold; margin-top: 5px;">
-        <span>⚖️ Weight: </span><span id="weight-bottom" title="点击修改体重">60</span> kg
+        <span>⚖️ Weight: </span><span id="weight-bottom" title="Click to change weight">60</span> kg
       </div>
     </div>
     <div class="icon-container">
         <a id="shareButton" href="#">
             <i class="fas fa-share-square"></i>
+        </a>
+        <a id="aiSettingsButton" href="#" title="AI Running Companion Settings">
+            <i class="fas fa-cog"></i>
         </a>
         <a href="https://github.com/Jamesun921/cam-run" target="_blank">
             <i class="fab fa-github"></i>
@@ -367,6 +505,37 @@
                 setTimeout(function() {
                     guidePrompt.style.display = 'none';
                 }, 1500);
+            });
+            
+            // AI陪跑设置对话框逻辑
+            const aiSettingsButton = document.getElementById('aiSettingsButton');
+            const aiSettingsDialog = document.getElementById('ai-settings-dialog');
+            const closeAiSettings = document.getElementById('close-ai-settings');
+            
+            // 打开设置对话框
+            aiSettingsButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                aiSettingsDialog.style.display = 'block';
+                
+                // 加载当前设置
+                if (window.aiCompanion) {
+                    const preference = window.aiCompanion.userPreference;
+                    
+                    // 设置复选框
+                    const checkboxes = document.querySelectorAll('input[name="promptType"]');
+                    checkboxes.forEach(checkbox => {
+                        checkbox.checked = preference.favoriteTypes.includes(checkbox.value);
+                    });
+                    
+                    // 设置下拉框
+                    document.getElementById('promptFrequency').value = preference.frequency;
+                    document.getElementById('promptStyle').value = preference.style;
+                }
+            });
+            
+            // 关闭设置对话框
+            closeAiSettings.addEventListener('click', function() {
+                aiSettingsDialog.style.display = 'none';
             });
         });
     </script>

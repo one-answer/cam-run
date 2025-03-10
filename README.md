@@ -1,7 +1,7 @@
 [中文说明](README.cn.md)
 # Webcam Runner
 
-A running game based on webcam, controlling the game character in an infinite scene by detecting user movements. Main technologies: Three.js, MediaPipe Pose
+A running game based on webcam, controlling the game character in an infinite scene by detecting user movements. **Now with AI Companion** providing real-time movement guidance and personalized feedback. Main technologies: Three.js, MediaPipe Pose
 
 ## Technical Architecture
 
@@ -20,10 +20,11 @@ A running game based on webcam, controlling the game character in an infinite sc
 ## Features
 
 ### Current Features
-1. Basic 3D Scene
-   - Infinite terrain generation
-   - Basic scene objects
-   - Dynamic camera system
+1. **AI Running Companion**
+   - Real-time movement guidance
+   - Personalized feedback system
+   - Adaptive difficulty adjustment
+   - Exercise intensity monitoring
 
 2. Motion Detection System
    - Supports full-body/half-body detection
@@ -31,6 +32,11 @@ A running game based on webcam, controlling the game character in an infinite sc
    - Intelligent movement judgment
    - User distance detection (supports close-range mode)
    - Movement intensity calculation (based on user weight)
+
+3. Basic 3D Scene
+   - Infinite terrain generation
+   - Basic scene objects
+   - Dynamic camera system
 
 ## System Requirements
 - Processor: Intel i3 or equivalent (recommended with AVX instruction set)
@@ -51,5 +57,3 @@ MIT License
 If you find this project useful, you can buy me a coffee:
 
 [![paypal](https://github.com/Ximi1970/Donate/blob/master/paypal_btn_donateCC_LG_1.gif)](https://paypal.me/jameszhai78)
-
-

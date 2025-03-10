@@ -3,6 +3,7 @@ import { gameState } from './gameState.js';
 import { poseDetector } from './pose.js';
 import { sceneManager } from './scene.js';
 import { renderer } from './renderer.js';
+import { aiCompanion } from './aiCompanion.js';
 
 class Game {
     constructor() {
@@ -14,41 +15,41 @@ class Game {
 
     async init() {
         try {
-            // 初始化游戏状态
+            // Initialize game state
             gameState.init();
             
-            // 初始化渲染器
+            // Initialize renderer
             renderer.init();
             
-            // 初始化场景
+            // Initialize scene
             await sceneManager.init();
             
-            // 检测操作系统
+            // Detect operating system
             const isMacOS = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
             if (isMacOS) {
-                console.log('检测到macOS平台，使用特殊处理...');
-                gameState.setState({ debugInfo: '检测到macOS平台，正在初始化摄像头...' });
+                console.log('Detected macOS platform, using special handling...');
+                gameState.setState({ debugInfo: 'Detected macOS platform, initializing camera...' });
             }
             
-            // 初始化摄像头
+            // Initialize camera
             const video = document.getElementById('webcamView');
             
             try {
-                // 首先检查是否在HTTPS环境下
+                // First, check if in HTTPS environment
                 const isSecure = window.location.protocol === 'https:' || 
                                 window.location.hostname === 'localhost' || 
                                 window.location.hostname === '127.0.0.1';
                 
                 if (!isSecure && isMacOS) {
-                    console.warn('在macOS上，摄像头访问通常需要HTTPS连接');
-                    gameState.setState({ debugInfo: '警告：非HTTPS连接可能无法访问摄像头' });
+                    console.warn('On macOS, camera access usually requires HTTPS connection');
+                    gameState.setState({ debugInfo: 'Warning: Non-HTTPS connection may not be able to access the camera' });
                 }
                 
-                // 首先尝试使用现代API
+                // First, try using modern API
                 if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-                    console.log('使用现代mediaDevices API');
+                    console.log('Using modern mediaDevices API');
                     
-                    // 在macOS上使用更简单的约束
+                    // On macOS, use simpler constraints
                     const constraints = isMacOS ? 
                         { video: true } : 
                         { 
@@ -63,23 +64,23 @@ class Game {
                     video.srcObject = stream;
                     await video.play();
                     
-                    // 继续初始化过程
+                    // Continue initialization process
                     await this.continueInit();
                     return;
                 }
                 
-                // 如果现代API不可用，尝试旧版API
-                console.log('现代API不可用，尝试旧版API');
+                // If modern API is not available, try old API
+                console.log('Modern API not available, trying old API');
                 const getUserMedia = navigator.getUserMedia || 
                                     navigator.webkitGetUserMedia || 
                                     navigator.mozGetUserMedia || 
                                     navigator.msGetUserMedia;
                 
                 if (!getUserMedia) {
-                    throw new Error('浏览器不支持摄像头访问，请使用最新版Chrome、Firefox或Edge浏览器');
+                    throw new Error('Browser does not support camera access, please use latest Chrome, Firefox or Edge browser');
                 }
                 
-                // 在macOS上使用更简单的约束
+                // On macOS, use simpler constraints
                 const constraints = isMacOS ? 
                     { video: true } : 
                     { 
@@ -90,85 +91,105 @@ class Game {
                         } 
                     };
                 
-                // 使用旧版API
+                // Use old API
                 getUserMedia.call(navigator, 
                     constraints,
                     (stream) => {
                         video.srcObject = stream;
                         video.play().then(() => {
-                            // 继续初始化过程
+                            // Continue initialization process
                             this.continueInit();
                         }).catch(err => {
-                            console.error('视频播放失败:', err);
-                            gameState.setState({ debugInfo: '视频播放失败: ' + err.message });
+                            console.error('Video playback failed:', err);
+                            gameState.setState({ debugInfo: 'Video playback failed: ' + err.message });
                         });
                     },
                     (err) => {
-                        console.error('摄像头访问失败:', err);
-                        gameState.setState({ debugInfo: '摄像头访问失败: ' + err.message });
+                        console.error('Camera access failed:', err);
+                        gameState.setState({ debugInfo: 'Camera access failed: ' + err.message });
                         
-                        // 在macOS上提供更多指导
+                        // Provide more guidance on macOS
                         if (isMacOS) {
                             gameState.setState({ 
-                                debugInfo: 'macOS摄像头访问失败: 请检查浏览器权限设置，并确保使用https或localhost' 
+                                debugInfo: 'macOS camera access failed: Please check browser permission settings and ensure using https or localhost' 
                             });
                         }
                     }
                 );
             } catch (mediaError) {
-                console.error('媒体访问错误:', mediaError);
+                console.error('Media access error:', mediaError);
                 
-                // 更详细的错误信息
-                let errorMessage = '摄像头访问失败: ' + mediaError.message;
+                // More detailed error message
+                let errorMessage = 'Camera access failed: ' + mediaError.message;
                 if (mediaError.name === 'NotAllowedError' || mediaError.name === 'PermissionDeniedError') {
-                    errorMessage = '摄像头访问被拒绝，请在浏览器中允许摄像头访问权限';
+                    errorMessage = 'Camera access denied, please allow camera access in browser settings';
                 } else if (mediaError.name === 'NotFoundError' || mediaError.name === 'DevicesNotFoundError') {
-                    errorMessage = '未找到摄像头设备，请确保您的设备有摄像头并已正确连接';
+                    errorMessage = 'No camera device found, please ensure your device has a camera and is properly connected';
                 } else if (mediaError.name === 'NotReadableError' || mediaError.name === 'TrackStartError') {
-                    errorMessage = '无法读取摄像头，可能被其他应用程序占用';
+                    errorMessage = 'Unable to read camera, possibly occupied by another application';
                 } else if (mediaError.name === 'OverconstrainedError') {
-                    errorMessage = '摄像头不支持请求的分辨率或帧率';
+                    errorMessage = 'Camera does not support the requested resolution or frame rate';
                 } else if (mediaError.name === 'TypeError' && mediaError.message.includes('getUserMedia')) {
-                    errorMessage = '浏览器不支持摄像头API或需要HTTPS连接';
+                    errorMessage = 'Browser does not support camera API or requires HTTPS connection';
                     
-                    // 针对macOS的特殊提示
+                    // Special guidance for macOS
                     if (isMacOS) {
-                        errorMessage += '。在macOS上，请确保使用https或localhost访问，并在系统偏好设置中允许浏览器访问摄像头';
+                        errorMessage += '. On macOS, please ensure using https or localhost and allow browser camera access in system preferences';
                     }
                 }
                 
                 gameState.setState({ debugInfo: errorMessage });
             }
         } catch (error) {
-            console.error('游戏初始化失败:', error);
-            gameState.setState({ debugInfo: '初始化失败: ' + error.message });
+            console.error('Game initialization failed:', error);
+            gameState.setState({ debugInfo: 'Initialization failed: ' + error.message });
         }
     }
     
     async continueInit() {
         try {
-            // 初始化姿势检测
+            // Initialize pose detection
             await poseDetector.init();
             
-            // 开始姿势检测
+            // Start pose detection
             poseDetector.startDetection();
             
-            // 开始游戏循环
+            // Initialize AI companion module
+            console.log('Preparing to initialize AI companion module');
+            await aiCompanion.init();
+            
+            // Add AI settings button event listener
+            document.getElementById('aiSettingsButton').addEventListener('click', (e) => {
+                e.preventDefault();
+                aiCompanion.showSettingsDialog();
+            });
+
+            // 绑定保存按钮事件
+            document.getElementById('save-ai-settings').addEventListener('click', () => {
+                aiCompanion.saveUserPreference();
+                const statusElement = document.createElement('div');
+                statusElement.textContent = 'Settings saved! ✔️';
+                statusElement.style.color = '#4CAF50';
+                document.body.appendChild(statusElement);
+                setTimeout(() => statusElement.remove(), 2000);
+            });
+            
+            // Start game loop
             this.isRunning = true;
             this.animate();
             
-            console.log('游戏初始化成功');
-            gameState.setState({ debugInfo: '准备开始...' });
+            console.log('Game initialization successful');
+            gameState.setState({ debugInfo: 'Ready to start...' });
         } catch (error) {
-            console.error('游戏初始化后续步骤失败:', error);
-            gameState.setState({ debugInfo: '初始化失败: ' + error.message });
+            console.error('Game initialization failed:', error);
+            gameState.setState({ debugInfo: 'Initialization failed: ' + error.message });
         }
     }
 
     animate(currentTime = 0) {
         if (!this.isRunning) return;
 
-        // 计算FPS
+        // Calculate FPS
         this.frameCount++;
         if (currentTime - this.lastFpsUpdate >= 1000) {
             const fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastFpsUpdate));
@@ -177,7 +198,7 @@ class Game {
             this.lastFpsUpdate = currentTime;
         }
 
-        // 更新场景
+        // Update scene
         const deltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
 
@@ -186,10 +207,10 @@ class Game {
             sceneManager.updateSpeed(state.currentSpeed);
         }
 
-        // 渲染场景
+        // Render scene
         sceneManager.render();
 
-        // 继续动画循环
+        // Continue animation loop
         requestAnimationFrame(time => this.animate(time));
     }
 
@@ -199,7 +220,7 @@ class Game {
     }
 }
 
-// 等待页面加载完成后初始化游戏
+// Wait for page load to initialize game
 window.addEventListener('load', () => {
     const game = new Game();
     game.init().catch(console.error);
@@ -208,11 +229,11 @@ window.addEventListener('load', () => {
         const websiteUrl = window.location.href;
         const steps = gameState.getSteps(); 
         const calories = gameState.getCalories(); 
-        const shareText = `我刚在${websiteUrl}上完成了${steps}步，消耗了${calories}卡路里！你也来试试吧！`;
+        const shareText = `I just completed ${steps} steps and burned ${calories} calories on ${websiteUrl}! Try it out!`;
         navigator.clipboard.writeText(shareText).then(function() {
-            alert('分享内容已复制到剪贴板！');
+            alert('Share content copied to clipboard!');
         }, function(err) {
-            console.error('无法复制分享内容: ', err);
+            console.error('Failed to copy share content: ', err);
         });
     });
 });

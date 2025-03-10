@@ -1,6 +1,6 @@
 # Webcam Runner
 
-一个基于网络摄像头的跑步游戏，通过检测用户的动作来控制游戏角色在无限场景中奔跑。主要技术：Three.js，MediaPipe Pose
+一个基于网络摄像头的跑步游戏，通过检测用户的动作来控制游戏角色在无限场景中奔跑。**新增AI陪跑功能**，提供实时动作指导和个性化反馈。主要技术：Three.js，MediaPipe Pose
 
 ## 技术架构
 
@@ -19,12 +19,18 @@
 ## 功能特性
 
 ### 现有功能
-1. 基础3D场景
+1. **AI运动陪跑**
+   - 实时动作指导
+   - 个性化反馈系统
+   - 自适应难度调节
+   - 运动强度监测
+
+2. 基础3D场景
    - 无限地形生成
    - 基本场景物体
    - 动态相机系统
 
-2. 动作检测系统
+3. 动作检测系统
    - 支持全身/半身检测
    - 实时动作分析
    - 智能运动判定
@@ -52,5 +58,3 @@ MIT License
 
 
 [![paypal](https://github.com/Ximi1970/Donate/blob/master/paypal_btn_donateCC_LG_1.gif)](https://paypal.me/jameszhai78)
-
-
