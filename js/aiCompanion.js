@@ -10,7 +10,7 @@ class AICompanion {
             // 默认用户偏好
             defaultPreference: {
                 favoriteTypes: ['Encouragement', 'Teasing'],
-                frequency: 'high', // Low, Medium, High
+                frequency: 'High', // Low, Medium, High
                 style: 'Humorous'
             },
             // 提示语显示时间(毫秒)
