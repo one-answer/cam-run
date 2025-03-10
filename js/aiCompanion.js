@@ -313,17 +313,6 @@ class AICompanion {
     showPrompt(message) {
         if (!this.promptElement) return;
         
-        // 记录提示历史
-        this.promptHistory.push({
-            time: Date.now(),
-            message: message
-        });
-        
-        // 只保留最近10条记录
-        if (this.promptHistory.length > 10) {
-            this.promptHistory.shift();
-        }
-        
         // 显示提示语
         this.promptElement.innerHTML = message;
         this.promptElement.style.display = 'block';
@@ -346,6 +335,17 @@ class AICompanion {
         
         // 更新最后提示时间
         this.lastPromptTime = Date.now();
+        
+        // 记录提示历史
+        this.promptHistory.push({
+            time: Date.now(),
+            message: message
+        });
+        
+        // 只保留最近10条记录
+        if (this.promptHistory.length > 10) {
+            this.promptHistory.shift();
+        }
     }
 
     // 生成提示语
