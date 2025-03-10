@@ -65,6 +65,7 @@ class Game {
                     await video.play();
                     
                     // Continue initialization process
+                    console.log('Camera initialized, calling continueInit');
                     await this.continueInit();
                     return;
                 }
@@ -98,6 +99,7 @@ class Game {
                         video.srcObject = stream;
                         video.play().then(() => {
                             // Continue initialization process
+                            console.log('Camera initialized, calling continueInit');
                             this.continueInit();
                         }).catch(err => {
                             console.error('Video playback failed:', err);

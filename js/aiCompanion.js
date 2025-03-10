@@ -10,7 +10,7 @@ class AICompanion {
             // 默认用户偏好
             defaultPreference: {
                 favoriteTypes: ['Encouragement', 'Teasing'],
-                frequency: 'Medium', // Low, Medium, High
+                frequency: 'high', // Low, Medium, High
                 style: 'Humorous'
             },
             // 提示语显示时间(毫秒)
@@ -298,11 +298,11 @@ class AICompanion {
     // 用户开始跑步时显示鼓励提示
     showEncouragementPrompt() {
         const encouragements = [
-            "开始跑步了！加油！💪",
-            "新的跑步旅程开始了，你可以的！🏃‍♂️",
-            "准备好了吗？让我们一起跑起来！🔥",
-            "今天是变得更强的好日子！💯",
-            "开始了！保持节奏，享受跑步的乐趣！🌟"
+            "Let's start running! Keep it up!<br>开始跑步了！加油！💪",
+            "A new running journey begins, you can do it!<br>新的跑步旅程开始了，你可以的！🏃‍♂️",
+            "Are you ready? Let's run together!<br>准备好了吗？让我们一起跑起来！🔥",
+            "Today is a great day to become stronger!<br>今天是变得更强的好日子！💯",
+            "Here we go! Keep the rhythm and enjoy the fun of running!<br>开始了！保持节奏，享受跑步的乐趣！🌟"
         ];
         
         const randomIndex = Math.floor(Math.random() * encouragements.length);
@@ -325,7 +325,7 @@ class AICompanion {
         }
         
         // 显示提示语
-        this.promptElement.textContent = message;
+        this.promptElement.innerHTML = message;
         this.promptElement.style.display = 'block';
         
         // 使用淡入效果
@@ -381,7 +381,8 @@ class AICompanion {
                         content: `根据以下跑步上下文和用户偏好生成一个个性化的提示语：
                         上下文：用户当前速度${context.speed}m/s，已跑${context.steps}步，消耗${context.calories}卡路里，情绪状态：${emotion}
                         用户偏好：喜欢的提示类型${this.userPreference.favoriteTypes.join('、')}，风格：${this.userPreference.style}
-                        请生成一个简短、有趣、鼓舞人心的提示语，长度控制在10-20字。禁止任何解释解析。禁止重复/冗余内容。`
+                        请生成一个简短、有趣、鼓舞人心的提示语，中文长度控制在10-20字。禁止任何解释解析。禁止重复/冗余内容。
+                        请返回两行，第一行是中文翻译好的英文，第二行是中文提示语。两行中间用html换行符分隔。`
                     }]
                 })
             });
@@ -415,68 +416,68 @@ class AICompanion {
             case 'Encouragement':
                 if (emotion === 'Tired') {
                     prompts = [
-                        "坚持住，休息是为了更好的坚持！💪",
-                        "每一步都是胜利，继续加油！🌟",
-                        "感到累很正常，但你比你想象的更强大！🔥",
-                        "慢一点也没关系，重要的是不停下来！👣",
-                        "呼吸，放松，然后继续前进！🌈"
+                        "Keep going, rest is for better persistence!<br>坚持住，休息是为了更好的坚持！💪",
+                        "Every step is a victory, keep it up!<br>每一步都是胜利，继续加油！🌟",
+                        "Feeling tired is normal, but you are stronger than you think!<br>感到累很正常，但你比你想象的更强大！🔥",
+                        "It's okay to go slow, the important thing is not to stop!<br>慢一点也没关系，重要的是不停下来！👣",
+                        "Breathe, relax, and keep moving forward!<br>呼吸，放松，然后继续前进！🌈"
                     ];
                 } else if (emotion === 'Excited') {
                     prompts = [
-                        "太棒了！你的状态简直完美！⚡",
-                        "看看你的速度，简直是飞起来了！🚀",
-                        "这种感觉真好，继续保持！🏆",
-                        "你就是为跑步而生的！💯",
-                        "这股能量太惊人了，继续释放它！✨"
+                        "Awesome! Your state is perfect!<br>太棒了！你的状态简直完美！⚡",
+                        "Look at your speed, you're flying!<br>看看你的速度，简直是飞起来了！🚀",
+                        "This feeling is great, keep it up!<br>这种感觉真好，继续保持！🏆",
+                        "You were born to run!<br>你就是为跑步而生的！💯",
+                        "This energy is amazing, keep releasing it!<br>这股能量太惊人了，继续释放它！✨"
                     ];
                 } else {
                     prompts = [
-                        "保持节奏，你做得很好！👍",
-                        "每一步都让你更接近目标！🎯",
-                        "感受身体的力量，你可以做到！💪",
-                        "专注当下，享受跑步的乐趣！🌟",
-                        "稳定呼吸，放松身体，继续前进！🏃‍♂️"
+                        "Keep the rhythm, you're doing great!<br>保持节奏，你做得很好！👍",
+                        "Every step brings you closer to your goal!<br>每一步都让你更接近目标！🎯",
+                        "Feel the power of your body, you can do it!<br>感受身体的力量，你可以做到！💪",
+                        "Focus on the present, enjoy the fun of running!<br>专注当下，享受跑步的乐趣！🌟",
+                        "Steady breathing, relax your body, keep moving forward!<br>稳定呼吸，放松身体，继续前进！🏃‍♂️"
                     ];
                 }
                 break;
                 
             case 'Prank':
                 prompts = [
-                    "想象身后有只老虎在追你...跑快点！🐯",
-                    "你的鞋带好像松了...哈哈，骗你的！😜",
-                    "左看右看，你是这条路上最帅的跑者！😎",
-                    "跑得再快一点，我就告诉你一个秘密！🤫",
-                    "你的跑步姿势像极了一只优雅的...企鹅？🐧"
+                    "Imagine a tiger is chasing you... run faster!<br>想象身后有只老虎在追你...跑快点！🐯",
+                    "Your shoelaces seem loose... just kidding!<br>你的鞋带好像松了...哈哈，骗你的！😜",
+                    "Look around, you're the coolest runner on this road!<br>左看右看，你是这条路上最帅的跑者！😎",
+                    "Run a little faster, and I'll tell you a secret!<br>跑得再快一点，我就告诉你一个秘密！🤫",
+                    "Your running posture looks like an elegant... penguin?<br>你的跑步姿势像极了一只优雅的...企鹅？🐧"
                 ];
                 break;
                 
             case 'Fun Facts':
                 prompts = [
-                    "你知道吗？跑步可以提高心血管健康！❤️",
-                    "专业跑者的平均步频是每分钟160-170步！👣",
-                    "跑步时呼吸可以帮助你放松！🌬️",
-                    "跑步可以提高你的新陈代谢率！🔥",
-                    "跑步可以让你更快乐！😊"
+                    "Did you know? Running can improve cardiovascular health!<br>你知道吗？跑步可以提高心血管健康！❤️",
+                    "The average cadence of professional runners is 160-170 steps per minute!<br>专业跑者的平均步频是每分钟160-170步！👣",
+                    "Breathing while running can help you relax!<br>跑步时呼吸可以帮助你放松！🌬️",
+                    "Running can increase your metabolic rate!<br>跑步可以提高你的新陈代谢率！🔥",
+                    "Running can make you happier!<br>跑步可以让你更快乐！😊"
                 ];
                 break;
                 
             case 'Challenge':
                 prompts = [
-                    "接下来30秒，试着加速冲刺一下！⚡",
-                    "挑战：保持当前速度再跑1分钟！⏱️",
-                    "数一数接下来20步，感受你的节奏！👣",
-                    "深呼吸3次，然后试着加快步伐！🌬️",
-                    "接下来10步，抬高你的膝盖！🦵"
+                    "Try sprinting for the next 30 seconds!<br>接下来30秒，试着加速冲刺一下！⚡",
+                    "Challenge: Keep the current speed for another minute!<br>挑战：保持当前速度再跑1分钟！⏱️",
+                    "Count the next 20 steps, feel your rhythm!<br>数一数接下来20步，感受你的节奏！👣",
+                    "Take 3 deep breaths, then try to speed up!<br>深呼吸3次，然后试着加快步伐！🌬️",
+                    "Lift your knees for the next 10 steps!<br>接下来10步，抬高你的膝盖！🦵"
                 ];
                 break;
                 
             default:
                 prompts = [
-                    "继续前进，你做得很棒！👍",
-                    "每一步都是胜利！🏆",
-                    "感受节奏，享受跑步！🎵",
-                    "你比昨天的自己更强大！💪",
-                    "呼吸，放松，继续！🌈"
+                    "Keep moving forward, you're doing great!<br>继续前进，你做得很棒！👍",
+                    "Every step is a victory!<br>每一步都是胜利！🏆",
+                    "Feel the rhythm, enjoy the run!<br>感受节奏，享受跑步！🎵",
+                    "You are stronger than yesterday!<br>你比昨天的自己更强大！💪",
+                    "Breathe, relax, keep going!<br>呼吸，放松，继续！🌈"
                 ];
         }
         
