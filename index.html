@@ -258,15 +258,40 @@
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
             max-width: 80%;
             transition: opacity 1.5s ease, visibility 1.5s ease;
+            width: auto;
+            height: auto;
+            max-height: 70vh;
+            overflow-y: auto;
         }
-        
-        #guide-prompt h3 {
-            margin-top: 0;
-            color: #4CAF50;
+
+        @media screen and (max-width: 768px) {
+            #guide-prompt {
+                font-size: 16px;
+                padding: 15px;
+                max-width: 85%;
+                width: 85%;
+                height: auto;
+                max-height: 65vh;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
         }
-        
-        #guide-prompt p {
-            margin-bottom: 0;
+
+        @media screen and (max-width: 480px) {
+            #guide-prompt {
+                font-size: 14px;
+                padding: 10px;
+                max-width: 90%;
+                width: 90%;
+                height: auto;
+                max-height: 60vh;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
         }
         
         /* AI提示语样式 */
@@ -275,10 +300,10 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 2em;
+            font-size: 1.6em;
             color: white;
             background-color: rgba(0, 0, 0, 0.7);
-            padding: 20px;
+            padding: 15px;
             border-radius: 10px;
             z-index: 1000;
             display: none;
@@ -286,19 +311,39 @@
             max-width: 80%;
             transition: opacity 0.5s ease-in-out;
             opacity: 0;
+            width: auto;
+            height: auto;
+            max-height: 70vh;
+            overflow-y: auto;
         }
-        
-        @media screen and (max-width: 768px) {
+
+        @media (max-width: 480px) {
             .ai-prompt {
-                font-size: 1.5em;
-                padding: 15px;
+                font-size: 1.2em;
+                padding: 10px;
+                max-width: 85%;
+                width: 85%;
+                height: auto;
+                max-height: 60vh;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
             }
         }
         
         @media screen and (max-width: 768px) {
-            #guide-prompt {
-                font-size: 16px;
-                padding: 15px;
+            .ai-prompt {
+                font-size: 1.4em;
+                padding: 12px;
+                max-width: 80%;
+                width: 80%;
+                height: auto;
+                max-height: 65vh;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
             }
         }
         

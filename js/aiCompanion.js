@@ -77,36 +77,6 @@ class AICompanion {
             promptElement.id = 'ai-prompt';
             promptElement.className = 'ai-prompt';
             document.body.appendChild(promptElement);
-            
-            // 添加样式
-            const style = document.createElement('style');
-            style.textContent = `
-                .ai-prompt {
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    font-size: 2em;
-                    color: white;
-                    background-color: rgba(0, 0, 0, 0.7);
-                    padding: 20px;
-                    border-radius: 10px;
-                    z-index: 1000;
-                    display: none;
-                    text-align: center;
-                    max-width: 80%;
-                    transition: opacity 0.5s ease-in-out;
-                    opacity: 0;
-                }
-                
-                @media screen and (max-width: 768px) {
-                    .ai-prompt {
-                        font-size: 1.5em;
-                        padding: 15px;
-                    }
-                }
-            `;
-            document.head.appendChild(style);
         }
         
         this.promptElement = promptElement;
