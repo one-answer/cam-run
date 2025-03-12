@@ -57,5 +57,5 @@ MIT License
 如果你觉得好，可以为我买杯咖啡：
 
 [![paypal](https://github.com/Ximi1970/Donate/blob/master/paypal_btn_donateCC_LG_1.gif)](https://paypal.me/jameszhai78)
-![支付宝收款码](images/alipay_qr.webp)
-![微信收款码](images/wechat_qr.webp)
+<img src="images/alipay_qr.webp" alt="支付宝收款码" style="width:200px;" />
+<img src="images/wechat_qr.webp" alt="微信收款码" style="width:200px;" />
