@@ -57,5 +57,6 @@ MIT License
 If you find this project useful, you can buy me a coffee:
 
 [![paypal](https://github.com/Ximi1970/Donate/blob/master/paypal_btn_donateCC_LG_1.gif)](https://paypal.me/jameszhai78)
+[![afdian.com](https://static.afdiancdn.com/static/img/logo/logo.png)](https://afdian.com/a/cam-run)
 <img src="images/alipay_qr.webp" alt="Alipay QR Code" style="width:200px;" />
 <img src="images/wechat_qr.webp" alt="WeChat QR Code" style="width:200px;" />
