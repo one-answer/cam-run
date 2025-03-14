@@ -50,8 +50,8 @@
 3. 允许摄像头访问权限
 
 
-## 许可证
-MIT License
+## 许可
+GNU General Public License v3.0 所有代码，包括历史记录，应视为受GPLv3约束
 
 ## 打赏
 如果你觉得好，可以为我买杯咖啡：

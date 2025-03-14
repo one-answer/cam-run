@@ -51,7 +51,7 @@ A running game based on webcam, controlling the game character in an infinite sc
 3. Allow camera access
 
 ## License
-MIT License
+GNU General Public License v3.0 所有代码，包括历史记录，应视为受GPLv3约束
 
 ## Donate
 If you find this project useful, you can buy me a coffee:
