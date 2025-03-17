@@ -40,8 +40,14 @@ class AICompanion {
         // 提示语DOM元素
         this.promptElement = null;
         
+        // 状态指示器元素
+        this.statusIndicator = document.querySelector('.ai-status-indicator i');
+        
         // 是否已初始化
         this.initialized = false;
+        
+        // 初始化时检查API状态
+        this.checkAPIStatus();
     }
 
     // 初始化
@@ -324,8 +330,12 @@ class AICompanion {
         // 如果配置了API，则调用API生成提示语
         if (this.config.apiConfig.url && this.config.apiConfig.apiKey) {
             try {
-                return await this.callPromptAPI(context, emotion);
+                this.updateStatusIndicator('active'); // 开始调用API时更新状态
+                const prompt = await this.callPromptAPI(context, emotion);
+                this.updateStatusIndicator('api-available'); // API调用成功后更新状态
+                return prompt;
             } catch (error) {
+                this.updateStatusIndicator('error'); // 发生错误时更新状态
                 console.error('API调用失败，使用本地提示语:', error);
                 return this.getLocalPrompt(context, emotion);
             }
@@ -346,13 +356,15 @@ class AICompanion {
                 },
                 body: JSON.stringify({
                     model: this.config.apiConfig.model,
+                    seed : context.steps,
+                    temperature: 0.8,
                     messages: [{ 
                         role: "user", 
-                        content: `根据以下跑步上下文和用户偏好生成一个个性化的提示语：
+                        content: `根据以下跑步上下文和用户偏好生成个性化提示语，融合他的步数、速度和卡路里消耗情况：
                         上下文：用户当前速度${context.speed}m/s，已跑${context.steps}步，消耗${context.calories}卡路里，情绪状态：${emotion}
-                        用户偏好：喜欢的提示类型${this.userPreference.favoriteTypes.join('、')}，风格：${this.userPreference.style}
-                        请生成一个简短、有趣、鼓舞人心的提示语，中文长度控制在10-20字。禁止任何解释解析。禁止重复/冗余内容。
-                        请返回两行，第一行是中文翻译好的英文，第二行是中文提示语。两行中间用html换行符分隔。`
+                        用户偏好：喜欢的提示内容类型：${this.userPreference.favoriteTypes.join(' 或 ')}，你要输出的风格为：${this.userPreference.style}
+                        请生成一个简短、有趣、鼓舞人心的中文提示语，中文长度控制在10-20字。禁止任何解释解析。禁止重复/冗余内容。
+                        请务必返回两行内容：首先生成中文，然后根据生成的中文翻译为英文。英文放在第一行，中文放在第二行，两行中间用html换行符分隔<br>。`
                     }]
                 })
             });
@@ -454,6 +466,56 @@ class AICompanion {
         // 随机选择一条提示语
         const randomIndex = Math.floor(Math.random() * prompts.length);
         return prompts[randomIndex];
+    }
+
+    // 更新AI状态指示器
+    updateStatusIndicator(status) {
+        if (!this.statusIndicator) return;
+        
+        // 移除之前的动画
+        this.statusIndicator.style.animation = 'none';
+        this.statusIndicator.offsetHeight; // 触发重绘
+        
+        switch(status) {
+            case 'active':
+            case 'api-available':
+                this.statusIndicator.style.color = '#4CAF50'; // 绿色
+                this.statusIndicator.style.animation = status === 'active' ? 'fadeInOut 2s 3' : 'none';
+                break;
+            default:
+                this.statusIndicator.style.color = '#000000'; // 黑色
+                this.statusIndicator.style.animation = 'none';
+                break;
+        }
+    }
+
+    // 检查API状态
+    async checkAPIStatus() {
+        try {
+            if (!this.config.apiConfig.url || !this.config.apiConfig.apiKey) {
+                this.updateStatusIndicator('api-unavailable');
+                return false;
+            }
+            
+            const response = await fetch(this.config.apiConfig.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.config.apiConfig.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: this.config.apiConfig.model,
+                    messages: [{ role: 'user', content: '返回ok' }]
+                })
+            });
+            
+            const isAvailable = response.ok;
+            this.updateStatusIndicator(isAvailable ? 'api-available' : 'api-unavailable');
+            return isAvailable;
+        } catch (error) {
+            this.updateStatusIndicator('api-unavailable');
+            return false;
+        }
     }
 }
 
