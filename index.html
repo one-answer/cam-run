@@ -412,6 +412,20 @@
         #save-ai-settings:hover {
             background-color: #45a049;
         }
+        
+        .ai-status-indicator {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            font-size: 40px;
+            z-index: 1000;
+            animation: fadeInOut 2s 3;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
     </style>
 </head>
 <body>
@@ -512,6 +526,7 @@
         </a>
     </div>
     <button id="fullscreen-button">⛶</button>
+    <div class="ai-status-indicator"><i class="fas fa-robot"></i></div>
     <!-- 第三方库 -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <!-- 游戏模块 -->
@@ -582,6 +597,15 @@
             closeAiSettings.addEventListener('click', function() {
                 aiSettingsDialog.style.display = 'none';
             });
+        });
+    </script>
+    <script>
+        window.addEventListener('load', () => {
+            
+            if (typeof addAPIStatusIndicator === 'function') {
+                
+                addAPIStatusIndicator();
+            }
         });
     </script>
  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9007180274439710" crossorigin="anonymous"></script>
