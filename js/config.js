@@ -124,12 +124,44 @@ export const GAME_CONFIG = {
         },
         // API配置
         apiConfig: { // 向 https://github.com/liseami/DeepRant 致敬
-            url: 'https://api.siliconflow.cn/v1/chat/completions',                  // API地址，留空则使用本地提示语
-            model: 'deepseek-ai/DeepSeek-V3',   // 模型名称
-            apiKey: 'sk-jleighwqdtyssxeycgmwxqrhbofpsbkhtobofxhbeyebupyh'                // API密钥，实际使用时应从环境变量或用户输入获取
+            url: 'https://api.stepfun.com/v1/chat/completions',                  // API地址，留空则使用本地提示语
+            model: 'step-2-16k',   // 模型名称
+            apiKey: '605JU1zU7cGmFp0ibbZlZZ3Qra3lRH7FDtpvICyf2pTrRrUaO6CQgW8p3sQatd5Wh'                // API密钥，实际使用时应从环境变量或用户输入获取
         }
     }
 };
+
+// 检测 AI Companion API 是否可用
+export const checkAICompanionAPI = async () => {
+    try {
+        
+        const response = await fetch(GAME_CONFIG.aiCompanion.apiConfig.url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${GAME_CONFIG.aiCompanion.apiConfig.apiKey}`
+            },
+            body: JSON.stringify({
+                model: GAME_CONFIG.aiCompanion.apiConfig.model,
+                messages: [{ role: 'user', content: '返回ok' }]
+            })
+        });
+        return response.ok;
+    } catch (error) {
+        return false;
+    }
+};
+
+// 在页面左上角添加标识
+export const addAPIStatusIndicator = () => {
+    const indicator = document.querySelector('.ai-status-indicator');
+    checkAICompanionAPI().then(isAvailable => {
+        indicator.style.color = isAvailable ? 'green' : 'black';
+    });
+};
+
+// 将函数添加到全局作用域
+window.addAPIStatusIndicator = addAPIStatusIndicator;
 
 // 骨骼渲染配置
 export const SKELETON_CONFIG = {
