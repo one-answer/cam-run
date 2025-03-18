@@ -1,5 +1,6 @@
 import { GAME_CONFIG, RENDER_CONFIG } from './config.js';
 import { renderer } from './renderer.js';
+import { sceneEnhancer } from './sceneEnhancer.js';
 
 class Scene {
     constructor() {
@@ -34,6 +35,11 @@ class Scene {
         this.initRenderer();
         this.initLights();
         this.initTerrain();
+        
+        // 初始化场景增强器
+        sceneEnhancer.scene = this.scene;
+        sceneEnhancer.init();
+        
         window.addEventListener('resize', this.onWindowResize.bind(this));
     }
 
@@ -85,33 +91,9 @@ class Scene {
             metalness: 0.2
         });
 
-        // 使用原始的尖形树木几何体
-        const treeGeometry = new THREE.CylinderGeometry(0, 1, 4, 4);
-        const treeMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-        const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, 2, 8);
-        const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-
         // 创建初始树木池
         for (let i = 0; i < this.terrainSystem.maxDecorationsPool; i++) {
-            const tree = new THREE.Group();
-            
-            const crown = new THREE.Mesh(treeGeometry, treeMaterial);
-            crown.position.y = 3;
-            crown.castShadow = true;
-            tree.add(crown);
-            
-            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-            trunk.position.y = 1;
-            trunk.castShadow = true;
-            tree.add(trunk);
-            
-            // 随机缩放树木，使其大小多样化
-            const scale = 0.8 + Math.random() * 0.4;
-            tree.scale.set(scale, scale, scale);
-            
-            tree.visible = false;
-            this.scene.add(tree);
-            this.decorationPool.push(tree);
+            this.createNewDecoration();
         }
 
         for (let i = 0; i < this.terrainSystem.activeSegments; i++) {
@@ -178,6 +160,9 @@ class Scene {
             this.camera.position.z + 15 // 增加前视距离
         );
         this.camera.lookAt(lookAtPoint);
+
+        // 更新场景增强器
+        sceneEnhancer.update(this.camera.position);
 
         this.updateTerrain();
     }
@@ -290,15 +275,15 @@ class Scene {
         const treeTypes = [
             // 尖形树
             { 
-                geometry: new THREE.ConeGeometry(0, 1, 4), 
+                geometry: new THREE.CylinderGeometry(0, 1, 4, 4), 
                 color: 0x228B22, 
                 scale: 1.5,
                 height: 3.5
             },
             // 更尖的树
             { 
-                geometry: new THREE.ConeGeometry(0, 1.2, 6), 
-                color: 0x32CD32, 
+                geometry: new THREE.CylinderGeometry(0, 1.2, 6, 6), 
+                color: 0x228B32, 
                 scale: 1.3,
                 height: 4
             },
@@ -315,14 +300,8 @@ class Scene {
                 color: 0x228B22,
                 scale: 1.2,
                 height: 3.2
-            },
-            // 宽尖形树
-            {
-                geometry: new THREE.ConeGeometry(0, 1.5, 8),
-                color: 0x006400,
-                scale: 1.4,
-                height: 3.8
             }
+
         ];
         
         const typeIndex = Math.floor(Math.random() * treeTypes.length);
@@ -332,7 +311,7 @@ class Scene {
         const tree = new THREE.Group();
         
         // 创建树冠
-        const crownMaterial = new THREE.MeshLambertMaterial({ color: type.color });
+        const crownMaterial = new THREE.MeshStandardMaterial({ color: type.color });
         const crown = new THREE.Mesh(type.geometry, crownMaterial);
         crown.position.y = type.height;
         crown.castShadow = true;
@@ -345,12 +324,13 @@ class Scene {
         trunk.position.y = type.height * 0.35;
         trunk.castShadow = true;
         tree.add(trunk);
-        
-        tree.scale.setScalar(type.scale);
-        tree.visible = false;
-        tree.castShadow = true;
-        tree.receiveShadow = true;
-        
+
+        // 随机缩放树木，使其大小多样化
+        const scale = 0.8 + Math.random() * 0.4;
+        tree.scale.set(scale, scale, scale);
+
+        // 将树木添加到场景和装饰物池
+        this.scene.add(tree);
         this.decorationPool.push(tree);
     }
 
@@ -408,9 +388,20 @@ class Scene {
             this.optimizePerformance();
         }
         
-        // 确保所有树木都可见
+        // // 平滑过渡到目标速度
+        // if (this.isRunning) {
+        //     this.speed = THREE.MathUtils.lerp(this.speed, this.targetSpeed, 0.05);
+        // } else {
+        //     this.speed = THREE.MathUtils.lerp(this.speed, 0, 0.1);
+        // }
+        
+        // // 更新速度
+        // this.updateSpeed(this.speed);
+        
+        // // 确保所有树木可见
         this.ensureTreesVisible();
         
+        // 渲染场景
         const directionalLight = this.scene.children.find(child => child instanceof THREE.DirectionalLight);
         if (directionalLight) {
             directionalLight.position.set(

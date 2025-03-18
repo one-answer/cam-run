@@ -104,6 +104,37 @@ export const GAME_CONFIG = {
     minStepInterval: 150,            // 进一步减少最小步伐间隔（毫秒），使步数增长更快
     armPhaseThreshold: 0.05,         // 保持手臂相位变化阈值不变
     
+    // 新增：场景增强器配置
+    sceneEnhancer: {
+        enabled: true,                // 启用场景增强器
+        // 小动物配置
+        animals: {
+            types: ['pigeon', 'squirrel', 'rabbit'],
+            maxCount: 10,             // 场景中最大小动物数量
+            poolSize: 20,             // 小动物对象池大小
+            spawnDistance: 30,        // 生成距离
+            despawnDistance: 50,      // 消失距离
+            spawnProbability: 0.2     // 每次更新的生成概率
+        },
+        // 植物配置
+        plants: {
+            types: ['bush', 'flower', 'grass'],
+            maxCount: 30,             // 场景中最大植物数量
+            poolSize: 50,             // 植物对象池大小
+            spawnDistance: 40,        // 生成距离
+            despawnDistance: 60,      // 消失距离
+            spawnProbability: 0.4     // 每次更新的生成概率
+        },
+        // 移动端优化
+        mobile: {
+            animalsEnabled: true,     // 移动端是否启用小动物
+            plantsEnabled: true,      // 移动端是否启用植物
+            maxAnimals: 5,            // 移动端最大小动物数量
+            maxPlants: 15,            // 移动端最大植物数量
+            spawnProbability: 0.1     // 移动端生成概率降低
+        }
+    },
+    
     // 新增：AI陪跑功能配置
     aiCompanion: {
         enabled: true,                // 启用AI陪跑功能

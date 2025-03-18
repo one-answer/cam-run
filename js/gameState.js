@@ -18,6 +18,11 @@ class GameState {
         this.lastUpdate = 0;
         this.movementBuffer = [];
         
+        // FPS 计算相关变量
+        this.frameCount = 0;
+        this.lastFpsUpdate = 0;
+        this.fpsUpdateInterval = 1000; // 每秒更新一次 FPS
+        
         // 步数检测相关变量
         this.lastStepTime = 0;
         this.armPhase = 'neutral'; // 'left_up', 'right_up', 'neutral'
@@ -71,6 +76,9 @@ class GameState {
     }
 
     updateMovement(quality) {
+        // 更新 FPS
+        this.updateFps();
+        
         // 更新动作质量
         this.state.movementQuality = quality * 100;
 
@@ -95,6 +103,27 @@ class GameState {
 
         // 更新状态显示
         this.updateDisplay();
+    }
+    
+    // 新增：计算并更新 FPS
+    updateFps() {
+        const now = performance.now();
+        this.frameCount++;
+        
+        // 每秒更新一次 FPS
+        if (now - this.lastFpsUpdate >= this.fpsUpdateInterval) {
+            // 计算 FPS：帧数 / 时间（秒）
+            this.state.fps = Math.round(this.frameCount * 1000 / (now - this.lastFpsUpdate));
+            
+            // 重置计数器
+            this.frameCount = 0;
+            this.lastFpsUpdate = now;
+            
+            // 在控制台输出 FPS（可选，调试用）
+            if (GAME_CONFIG.debug) {
+                console.log(`当前 FPS: ${this.state.fps}`);
+            }
+        }
     }
     
     // 新增：计算卡路里消耗
