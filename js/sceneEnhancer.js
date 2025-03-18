@@ -141,7 +141,7 @@ class SceneEnhancer {
                 // 设置动画参数
                 animal.userData = {
                     type: 'pigeon',
-                    height: 0.5 + Math.random() * 0.5, // 飞行高度
+                    height: 1.5 + Math.random() * 1.0, // 增加飞行高度，使鸽子在天空中
                     speed: 0.01 + Math.random() * 0.02,
                     amplitude: 0.1 + Math.random() * 0.1, // 上下振幅
                     frequency: 1 + Math.random() * 2,    // 振动频率
@@ -270,7 +270,7 @@ class SceneEnhancer {
                 plant = new THREE.Group();
                 
                 // 灌木主体 - 多个重叠的球体
-                const bushSize = 0.3 + Math.random() * 0.3;
+                const bushSize = 0.5 + Math.random() * 0.4; // 增大灌木尺寸
                 const bushColor = 0x2E8B57; // 深绿色
                 
                 for (let i = 0; i < 5; i++) {
@@ -302,31 +302,31 @@ class SceneEnhancer {
                 plant = new THREE.Group();
                 
                 // 茎 - 细长的圆柱体
-                geometry = new THREE.CylinderGeometry(0.01, 0.01, 0.3, 8);
+                geometry = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8); // 增加茎的高度和粗度
                 material = new THREE.MeshLambertMaterial({ color: 0x228B22 });
                 const stem = new THREE.Mesh(geometry, material);
-                stem.position.y = 0.15;
+                stem.position.y = 0.25; // 调整茎的位置
                 plant.add(stem);
                 
                 // 花朵 - 圆盘
                 const flowerColors = [0xFF69B4, 0xFFFF00, 0xFF6347, 0x9370DB, 0x00BFFF];
                 const flowerColor = flowerColors[Math.floor(Math.random() * flowerColors.length)];
                 
-                geometry = new THREE.CircleGeometry(0.05 + Math.random() * 0.03, 8);
+                geometry = new THREE.CircleGeometry(0.3 + Math.random() * 0.3, 8); // 增大花朵尺寸
                 material = new THREE.MeshLambertMaterial({ 
                     color: flowerColor,
                     side: THREE.DoubleSide
                 });
                 const flower = new THREE.Mesh(geometry, material);
-                flower.position.y = 0.3;
+                flower.position.y = 0.5; // 调整花朵位置
                 flower.rotation.x = -Math.PI / 2;
                 plant.add(flower);
                 
                 // 花蕊 - 小球体
-                geometry = new THREE.SphereGeometry(0.02, 8, 8);
+                geometry = new THREE.SphereGeometry(0.03, 8, 8); // 增大花蕊尺寸
                 material = new THREE.MeshLambertMaterial({ color: 0xFFFF00 });
                 const center = new THREE.Mesh(geometry, material);
-                center.position.y = 0.31;
+                center.position.y = 0.51; // 调整花蕊位置
                 plant.add(center);
                 
                 // 设置植物参数
@@ -339,37 +339,106 @@ class SceneEnhancer {
                 break;
                 
             case 'grass':
-                // 草 - 使用多个平面
+                // 草 - 使用多个平面和更多细节
                 plant = new THREE.Group();
                 
-                // 草叶 - 多个平面
-                const grassCount = 3 + Math.floor(Math.random() * 4);
-                const grassHeight = 0.15 + Math.random() * 0.15;
-                const grassColor = 0x7CFC00; // 亮绿色
+                // 草叶 - 多个平面，更多样化
+                const grassCount = 5 + Math.floor(Math.random() * 6); // 增加草叶数量
+                const baseGrassHeight = 0.4 + Math.random() * 0.5; // 基础草高度
                 
+                // 草的颜色变化 - 从深绿到浅绿的渐变
+                const grassColors = [
+                    0x7CFC00, // 亮绿色
+                    0x90EE90, // 淡绿色
+                    0x32CD32, // 酸橙绿
+                    0x228B22, // 森林绿
+                    0x006400  // 深绿色
+                ];
+                
+                // 草地底部 - 添加一个圆盘作为草地基座
+                const baseGeometry = new THREE.CircleGeometry(0.25, 8);
+                const baseMaterial = new THREE.MeshLambertMaterial({
+                    color: 0x2E8B57, // 海洋绿色
+                    side: THREE.DoubleSide
+                });
+                const grassBase = new THREE.Mesh(baseGeometry, baseMaterial);
+                grassBase.rotation.x = -Math.PI / 2;
+                grassBase.position.y = 0.01; // 稍微抬高一点，避免z-fighting
+                plant.add(grassBase);
+                
+                // 创建草叶
                 for (let i = 0; i < grassCount; i++) {
-                    geometry = new THREE.PlaneGeometry(0.03 + Math.random() * 0.02, grassHeight);
-                    material = new THREE.MeshLambertMaterial({ 
+                    // 随机选择草叶颜色
+                    const grassColor = grassColors[Math.floor(Math.random() * grassColors.length)];
+                    
+                    // 随机草叶高度 - 中间的草叶更高
+                    const heightVariation = Math.abs((i / grassCount) - 0.5); // 0到0.5之间的值
+                    const grassHeight = baseGrassHeight * (1 - heightVariation * 0.5);
+                    
+                    // 创建草叶几何体 - 使用更窄的底部和更宽的顶部
+                    const bladeWidth = 0.04 + Math.random() * 0.03;
+                    const bladeGeometry = new THREE.BufferGeometry();
+                    
+                    // 创建一个弯曲的草叶形状
+                    const curve = Math.random() * 0.3; // 弯曲程度
+                    const curveDirection = Math.random() > 0.5 ? 1 : -1; // 弯曲方向
+                    
+                    // 草叶顶点 - 底部窄，顶部宽，并且有弯曲
+                    const vertices = new Float32Array([
+                        -bladeWidth * 0.5, 0, 0, // 左下
+                        bladeWidth * 0.5, 0, 0,  // 右下
+                        -bladeWidth * 0.7, grassHeight, curveDirection * curve, // 左上
+                        bladeWidth * 0.7, grassHeight, curveDirection * curve   // 右上
+                    ]);
+                    
+                    // 顶点索引 - 两个三角形组成一个四边形
+                    const indices = [
+                        0, 1, 2,
+                        2, 1, 3
+                    ];
+                    
+                    // 设置顶点和索引
+                    bladeGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+                    bladeGeometry.setIndex(indices);
+                    bladeGeometry.computeVertexNormals();
+                    
+                    // 草叶材质 - 半透明效果
+                    const bladeMaterial = new THREE.MeshLambertMaterial({
                         color: grassColor,
-                        side: THREE.DoubleSide
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.9
                     });
-                    const grassBlade = new THREE.Mesh(geometry, material);
+                    
+                    const grassBlade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+                    
+                    // 随机分布位置 - 使用极坐标更均匀分布
+                    const angle = (i / grassCount) * Math.PI * 2 + Math.random() * 0.5;
+                    const radius = 0.05 + Math.random() * 0.15;
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    
                     grassBlade.position.set(
-                        (Math.random() - 0.5) * 0.1,
+                        x,
                         grassHeight / 2,
-                        (Math.random() - 0.5) * 0.1
+                        z
                     );
-                    grassBlade.rotation.y = Math.random() * Math.PI;
-                    grassBlade.rotation.x = (Math.random() - 0.5) * 0.2;
+                    
+                    // 随机旋转
+                    grassBlade.rotation.y = angle + Math.PI / 2;
+                    grassBlade.rotation.x = (Math.random() - 0.5) * 0.3;
+                    grassBlade.rotation.z = (Math.random() - 0.5) * 0.2;
+                    
                     plant.add(grassBlade);
                 }
                 
-                // 设置植物参数
+                // 设置植物参数 - 改进摇摆动画
                 plant.userData = {
                     type: 'grass',
-                    swayAmplitude: 0.15 + Math.random() * 0.15,
-                    swayFrequency: 1.5 + Math.random() * 1.5,
-                    swayPhase: Math.random() * Math.PI * 2
+                    swayAmplitude: 0.1 + Math.random() * 0.2, // 更自然的摇摆幅度
+                    swayFrequency: 1.2 + Math.random() * 2.0, // 更多样的频率
+                    swayPhase: Math.random() * Math.PI * 2,
+                    individualSway: true // 标记为单独摇摆
                 };
                 break;
         }
@@ -488,7 +557,13 @@ class SceneEnhancer {
             const z = cameraPosition.z + Math.sin(angle) * distance + distance * 0.5; // 确保在前方
             
             // 设置高度
-            const y = animal.userData.height || 0.1;
+            let y = animal.userData.height || 0.1;
+            
+            // 对于鸽子，确保它们主要在天空中
+            if (animal.userData.type === 'pigeon') {
+                // 确保鸽子在天空中，高度至少为1.0
+                y = Math.max(y, 1.0);
+            }
             
             animal.position.set(x, y, z);
             animal.rotation.y = Math.random() * Math.PI * 2;
@@ -573,9 +648,29 @@ class SceneEnhancer {
         // 植物动画更新（摇摆效果）
         const time = performance.now() * 0.001;
         this.plants.forEach(plant => {
-            if (plant.userData.type === 'flower' || plant.userData.type === 'grass') {
-                const { swayAmplitude, swayFrequency, swayPhase } = plant.userData;
-                if (swayAmplitude && swayFrequency) {
+            // 为所有植物类型添加摇摆效果
+            const { swayAmplitude, swayFrequency, swayPhase, individualSway, type } = plant.userData;
+            
+            if (swayAmplitude && swayFrequency) {
+                if (individualSway && type === 'grass') {
+                    // 对于草地，为每个草叶单独添加摇摆效果
+                    plant.children.forEach((child, index) => {
+                        // 跳过草地基座（第一个子对象）
+                        if (index === 0) return;
+                        
+                        // 为每个草叶设置不同的摇摆相位和频率
+                        const childPhase = swayPhase + index * 0.5;
+                        const childFreq = swayFrequency * (0.8 + index * 0.05);
+                        
+                        // 应用摇摆效果 - 更自然的摇摆
+                        child.rotation.x = Math.sin(time * childFreq + childPhase) * swayAmplitude * 0.8;
+                        child.rotation.z = Math.cos(time * childFreq * 0.7 + childPhase) * swayAmplitude;
+                        
+                        // 添加一点点旋转，使草叶看起来更自然
+                        child.rotation.y = Math.sin(time * childFreq * 0.3 + childPhase) * swayAmplitude * 0.2;
+                    });
+                } else {
+                    // 对于其他植物，整体摇摆
                     plant.rotation.x = Math.sin(time * swayFrequency + swayPhase) * swayAmplitude;
                     plant.rotation.z = Math.cos(time * swayFrequency + swayPhase) * swayAmplitude;
                 }

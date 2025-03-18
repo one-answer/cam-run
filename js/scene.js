@@ -326,8 +326,18 @@ class Scene {
         tree.add(trunk);
 
         // 随机缩放树木，使其大小多样化
-        const scale = 0.8 + Math.random() * 0.4;
-        tree.scale.set(scale, scale, scale);
+        // const scale = 0.8 + Math.random() * 0.4;
+        // tree.scale.set(scale, scale, scale);
+
+        // 随机生成树木的位置
+        const canvasWidth = window.innerWidth;
+        const canvasHeight = window.innerHeight;
+        const treePosition = {
+            x: Math.random() * canvasWidth,
+            y: Math.random() * canvasHeight,
+            scale: 0.5 + Math.random() * 0.5
+        };
+        tree.position.set(treePosition.x, treePosition.y, 0);
 
         // 将树木添加到场景和装饰物池
         this.scene.add(tree);
