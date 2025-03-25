@@ -609,5 +609,58 @@
         });
     </script>
  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9007180274439710" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener('keydown', async (event) => {
+            // F键全屏逻辑保持不变
+            if (event.key === 'f' || event.key === 'F') {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.log(`全屏请求失败: ${err.message}`);
+                    });
+                } else {
+                    document.exitFullscreen().catch(err => {
+                        console.log(`退出全屏失败: ${err.message}`);
+                    });
+                }
+            }
+            
+            // 改进的C键截屏逻辑
+            if (event.key === 'c' || event.key === 'C') {
+                try {
+                    const stream = await navigator.mediaDevices.getDisplayMedia({
+                        preferCurrentTab: true,
+                        selfBrowserSurface: "include",
+                        surfaceSwitching: "include",
+                        systemAudio: "exclude",
+                        video: {
+                            displaySurface: "browser",
+                            logicalSurface: true,
+                            cursor: "never"
+                        }
+                    });
+                    
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    await video.play();
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    const link = document.createElement('a');
+                    link.download = `webcam-runner-${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                } catch (err) {
+                    console.error('截图失败:', err);
+                }
+            }
+        });
+    </script>
+    <!-- 添加 html2canvas 库 -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 </body>
 </html>
