@@ -5,8 +5,14 @@ import { gameState } from './gameState.js';
 class AICompanion {
     constructor() {
         this.config = {
-            // 提示语类型
-            promptTypes: ['Encouragement', 'Prank', 'Fun Facts', 'Challenge'],
+            // 提示语类型及其中文对照
+            promptTypes: ['Encouragement', 'Prank', 'Fun Facts', 'Challenge Tasks'],
+            promptTypeMap: {
+                'Encouragement': '鼓励，激励',
+                'Prank': '调侃，无厘头',
+                'Fun Facts': '有关运动的各类趣闻、知识',
+                'Challenge Tasks': '对用户的跑步提出挑战任务'
+            },
             // 默认用户偏好
             defaultPreference: {
                 favoriteTypes: ['Encouragement', 'Teasing'],
@@ -348,6 +354,11 @@ class AICompanion {
     // 调用提示语API
     async callPromptAPI(context, emotion) {
         try {
+            // 将英文类型转换为中文
+            const favoriteTypesInChinese = this.userPreference.favoriteTypes.map(
+                type => this.config.promptTypeMap[type] || type
+            );
+
             const response = await fetch(this.config.apiConfig.url, {
                 method: 'POST',
                 headers: {
@@ -360,11 +371,11 @@ class AICompanion {
                     temperature: 0.8,
                     messages: [{ 
                         role: "user", 
-                        content: `根据以下跑步上下文和用户偏好生成个性化提示语，融合他的步数、速度和卡路里消耗情况：
-                        上下文：用户当前速度${context.speed}m/s，已跑${context.steps}步，消耗${context.calories}卡路里，情绪状态：${emotion}
-                        用户偏好：喜欢的提示内容类型：${this.userPreference.favoriteTypes.join(' 或 ')}，你要输出的风格为：${this.userPreference.style}
-                        请生成一个简短、有趣、鼓舞人心的中文提示语，中文长度控制在10-20字。禁止任何解释解析。禁止重复/冗余内容。
-                        请务必返回两行内容：首先生成中文，然后根据生成的中文翻译为英文。英文放在第一行，中文放在第二行，两行中间用html换行符分隔<br>。`
+                        content: `用户当前正在跑步运动，
+                        跑步状况：用户当前速度${context.speed}m/s，已跑${context.steps}步，消耗${context.calories}卡路里，情绪状态：${emotion}
+                        用户需要的内容为：'${favoriteTypesInChinese.join(' 或 ')}'，你要输出的话语风格为：'${this.userPreference.style}'
+                        请根据用户需要的内容和风格生成一个中文提示语，中文长度控制在10-20字。禁止任何解释解析。禁止重复/冗余内容。只返回提示语本身，不要有其他说明。
+                        请务必返回两行内容：英文放在第一行，中文放在第二行，其中的英文是根据中文提示语翻译而来。最终返回内容里，两行中间用html换行符分隔<br>。`
                     }]
                 })
             });
@@ -374,7 +385,11 @@ class AICompanion {
             }
             
             const data = await response.json();
-            return data.choices[0].message.content;
+            // 过滤掉<think>标签内容
+            let content = data.choices[0].message.content;
+            content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+            return content; 
+            
         } catch (error) {
             console.error('API调用错误:', error);
             throw error;
