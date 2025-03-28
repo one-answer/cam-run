@@ -426,6 +426,25 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
         }
+        
+        /* 语言切换按钮样式 */
+        #language-switcher {
+            position: fixed;
+            top: 10px;
+            right: 70px;
+            z-index: 1000;
+            background-color: rgba(0, 0, 0, 0.3);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        #language-switcher:hover {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
     </style>
 </head>
 <body>
@@ -526,6 +545,7 @@
         </a>
     </div>
     <button id="fullscreen-button">⛶</button>
+    <button id="language-switcher">🌐 EN/中文</button>
     <div class="ai-status-indicator"><i class="fas fa-robot"></i></div>
     <!-- 第三方库 -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>

@@ -95,3 +95,5 @@ public/
 # Windows files
 Thumbs.db
 ehthumbs.db
+
+.idea/

@@ -4,6 +4,7 @@ import { poseDetector } from './pose.js';
 import { sceneManager } from './scene.js';
 import { renderer } from './renderer.js';
 import { aiCompanion } from './aiCompanion.js';
+import { i18n } from './i18n.js';
 
 class Game {
     constructor() {
@@ -15,6 +16,9 @@ class Game {
 
     async init() {
         try {
+            // Initialize i18n
+            i18n.init();
+            
             // Initialize game state
             gameState.init();
             
@@ -226,6 +230,24 @@ class Game {
 window.addEventListener('load', () => {
     const game = new Game();
     game.init().catch(console.error);
+    
+    // 添加语言切换按钮事件监听
+    const languageSwitcher = document.getElementById('language-switcher');
+    if (languageSwitcher) {
+        languageSwitcher.addEventListener('click', () => {
+            // 切换语言
+            const currentLang = i18n.currentLang;
+            const newLang = currentLang === 'en-US' ? 'zh-CN' : 'en-US';
+            i18n.setLanguage(newLang);
+            
+            // 更新游戏状态显示
+            if (window.gameState) {
+                window.gameState.updateDisplay();
+            }
+            
+            console.log(`Language switched to: ${newLang}`);
+        });
+    }
     
     document.getElementById('shareButton').addEventListener('click', function() {
         const websiteUrl = window.location.href;

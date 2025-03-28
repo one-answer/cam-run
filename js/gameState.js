@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from './config.js';
+import { i18n } from './i18n.js';
 
 class GameState {
     constructor() {
@@ -268,152 +269,59 @@ class GameState {
         // 等待DOM加载完成
         document.addEventListener('DOMContentLoaded', () => {
             // 为体重显示元素添加点击事件
-            const weightElements = ['user-weight-debug', 'weight-bottom', 'weightDisplay'];
+            const weightElements = [
+                document.getElementById('user-weight-debug'),
+                document.getElementById('weight-bottom')
+            ];
             
-            weightElements.forEach(id => {
-                const element = document.getElementById(id);
+            weightElements.forEach(element => {
                 if (element) {
-                    element.style.cursor = 'pointer'; // 添加指针样式表明可点击
-                    element.title = '点击修改体重'; // 添加提示
-                    
                     element.addEventListener('click', () => {
-                        this.showWeightDialog();
+                        // 提示用户输入新的体重
+                        const newWeight = prompt(i18n.t('enter_weight_prompt', {default: this.state.userWeight}), this.state.userWeight);
+                        
+                        // 验证输入
+                        if (newWeight !== null && !isNaN(newWeight) && newWeight > 0) {
+                            this.state.userWeight = parseFloat(newWeight);
+                            this.updateDisplay();
+                        }
                     });
                 }
             });
         });
     }
     
-    // 显示修改体重的对话框
-    showWeightDialog() {
-        const currentWeight = this.state.userWeight;
-        const newWeight = prompt(`请输入您的体重(kg)，当前体重: ${currentWeight}kg`, currentWeight);
-        
-        // 验证输入
-        if (newWeight !== null) {
-            const weightValue = parseFloat(newWeight);
-            if (!isNaN(weightValue) && weightValue > 0) {
-                this.updateUserWeight(weightValue);
-            } else {
-                alert('请输入有效的体重值');
-            }
-        }
-    }
-
-    // 更新用户体重
-    updateUserWeight(weight) {
-        if (weight && weight > 0) {
-            this.state.userWeight = weight;
-            // 更新显示
-            this.updateDisplay();
-        }
-    }
-
     updateDisplay() {
-        try {
-            // 更新 FPS
-            document.getElementById('fps').textContent = Math.round(this.state.fps);
-            
-            // 更新动作质量
-            document.getElementById('quality').textContent = 
-                this.state.movementQuality.toFixed(1) + '%';
-            
-            // 更新速度并应用样式
-            const speedValue = this.state.currentSpeed.toFixed(1);
-            let speedText = speedValue + ' m/s';
-            let speedClass = '';
-            
-            if (this.state.currentSpeed === 0) {
-                // 未开始跑步
-                document.getElementById('speed').innerHTML = '当前速度: ' + speedText ;
-            } else {
-                // 确定速度级别和对应的样式类
-                if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.slow) {
-                    speedClass = 'speed-slow';
-                } else if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.medium) {
-                    speedClass = 'speed-medium';
-                } else {
-                    speedClass = 'speed-fast';
-                }
-                
-                // 创建带有样式的速度显示
-                document.getElementById('speed').innerHTML = 
-                    '当前速度: <span class="speed-indicator ' + speedClass + '">' + 
-                    speedText + '</span>';
-            }
-            
-            // 右下角速度显示 - 同步更新并应用相同的样式类
-            const speedBottomElement = document.getElementById('speed-bottom');
-            if (speedBottomElement) {
-                if (this.state.currentSpeed === 0) {
-                    speedBottomElement.textContent = speedText;
-                } else {
-                    speedBottomElement.innerHTML = '<span class="' + speedClass + '">' + speedText + '</span>';
-                }
-            }
-            
-            // 更新步数
-            document.getElementById('steps').textContent = this.state.stepCount;
-            
-            // 更新右下角步数
-            const stepsBottomElement = document.getElementById('steps-bottom');
-            if (stepsBottomElement) {
-                stepsBottomElement.textContent = this.state.stepCount;
-            }
-            
-            // 更新卡路里消耗
-            document.getElementById('calories').textContent = 
-                this.state.caloriesBurned.toFixed(1);
-            
-            // 更新右下角卡路里消耗
-            const caloriesBottomElement = document.getElementById('calories-bottom');
-            if (caloriesBottomElement) {
-                caloriesBottomElement.textContent = this.state.caloriesBurned.toFixed(1);
-            }
-            
-            // 更新所有体重显示元素
-            const weightElements = {
-                'user-weight-debug': true,  // 调试区域显示
-                'weight-bottom': true,      // 右下角显示
-                'weightDisplay': false      // 其他显示
-            };
-            
-            for (const [id, isSpan] of Object.entries(weightElements)) {
-                const element = document.getElementById(id);
-                if (element) {
-                    if (isSpan) {
-                        element.textContent = this.state.userWeight;
-                    } else {
-                        element.textContent = `Weight: ${this.state.userWeight} kg`;
-                    }
-                }
-            }
-            
-            // 更新调试信息
-            const debugElements = ['debug', 'debugInfo'];
-            debugElements.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.textContent = this.state.debugInfo;
-                }
-            });
-            
-            // 更新其他状态显示
-            this.updateMetrics();
-        } catch (error) {
-            console.error('更新显示错误:', error);
-        }
-    }
-    
-    // 新增：更新其他状态显示
-    updateMetrics() {
-        // 确定速度级别和对应的样式类
-        let speedClass = '';
-        const speedValue = this.state.currentSpeed.toFixed(1);
-        const speedText = `${speedValue} m/s`;
+        // 更新游戏状态显示
+        const fpsElement = document.getElementById('fps');
+        const qualityElement = document.getElementById('quality');
+        const speedElement = document.getElementById('speed');
+        const stepsElement = document.getElementById('steps');
+        const caloriesElement = document.getElementById('calories');
+        const weightElement = document.getElementById('user-weight-debug');
+        const debugElement = document.getElementById('debug');
         
-        if (this.state.currentSpeed > 0) {
-            // 确定速度级别和对应的样式类
+        if (fpsElement) fpsElement.textContent = this.state.fps;
+        if (qualityElement) qualityElement.textContent = this.state.movementQuality.toFixed(1) + '%';
+        if (speedElement) speedElement.textContent = i18n.t('current_speed', {speed: this.state.currentSpeed.toFixed(1)});
+        if (stepsElement) stepsElement.textContent = this.state.stepCount;
+        if (caloriesElement) caloriesElement.textContent = this.state.caloriesBurned.toFixed(1);
+        if (weightElement) weightElement.textContent = this.state.userWeight;
+        if (debugElement) debugElement.textContent = this.state.debugInfo;
+        
+        // 更新底部指标显示
+        const speedBottomElement = document.getElementById('speed-bottom');
+        const stepsBottomElement = document.getElementById('steps-bottom');
+        const caloriesBottomElement = document.getElementById('calories-bottom');
+        const weightBottomElement = document.getElementById('weight-bottom');
+        
+        if (speedBottomElement) {
+            // 将米/秒转换为公里/小时
+            const speedKmh = (this.state.currentSpeed * 3.6).toFixed(1);
+            speedBottomElement.textContent = `${speedKmh} km/h`;
+            
+            // 根据速度设置颜色
+            let speedClass = '';
             if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.slow) {
                 speedClass = 'speed-slow';
             } else if (this.state.currentSpeed < GAME_CONFIG.speedColorThresholds.medium) {
@@ -421,22 +329,16 @@ class GameState {
             } else {
                 speedClass = 'speed-fast';
             }
+            
+            // 移除所有速度相关的类
+            speedBottomElement.classList.remove('speed-slow', 'speed-medium', 'speed-fast');
+            // 添加当前速度对应的类
+            speedBottomElement.classList.add(speedClass);
         }
         
-        const metrics = {
-            'speed-bottom': this.state.currentSpeed === 0 ? 
-                speedText : 
-                `<span class="${speedClass}">${speedText}</span>`,
-            'steps-bottom': this.state.stepCount,
-            'calories-bottom': `${this.state.caloriesBurned.toFixed(1)}`
-        };
-        
-        for (const [id, value] of Object.entries(metrics)) {
-            const element = document.getElementById(id);
-            if (element) {
-                element.innerHTML = value;
-            }
-        }
+        if (stepsBottomElement) stepsBottomElement.textContent = this.state.stepCount;
+        if (caloriesBottomElement) caloriesBottomElement.textContent = this.state.caloriesBurned.toFixed(1);
+        if (weightBottomElement) weightBottomElement.textContent = this.state.userWeight;
     }
 
     updateFPS(fps) {
