@@ -10,7 +10,7 @@ export const i18n = {
     translations: {
         'en-US': {
             // 通用
-            'app_title': 'Webcam Runner',
+            'app_title': 'Human Pose Detection Running Game',
             'loading': 'Loading...',
             'ready': 'Ready to start...',
             'getting_ready': 'Getting ready...',
@@ -78,7 +78,7 @@ export const i18n = {
         },
         'zh-CN': {
             // 通用
-            'app_title': '网络摄像头跑步',
+            'app_title': '人体姿态识别跑步游戏',
             'loading': '加载中...',
             'ready': '准备开始...',
             'getting_ready': '准备中...',
