@@ -1,11 +1,17 @@
 {
-  "name": "Cam Run",
-  "short_name": "CamRun",
+  "name": "人体姿态识别跑步游戏",
+  "short_name": "姿态跑步",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#007bff",
+  "background_color": "#4285F4",
+  "theme_color": "#4285F4",
   "icons": [
+    {
+      "src": "icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "icons/icon-192x192.png",
       "sizes": "192x192",
